@@ -1,801 +1,904 @@
---[[
-    AUTO COIN V3 - Separate Controls & Monitor
-    Tombol dan Monitor terpisah untuk kontrol yang lebih baik
---]]
-
------- SERVICES ------
+--// Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
------- KONSTANTA ------
-local PAUSE_INTERVAL = 60 * 60
-local PAUSE_DURATION = 30
-local WIN_DELAY_BASE = 10000
-local DEFAULT_HEIGHT = 5000
-local DEFAULT_DELAY = 5
-local HEIGHT_MULTIPLIER = 2.8
-local MAX_HEIGHT = 14400
+--// Variables
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local delayTime = 1
+local heroId = 7000117
+local drawCount = 10
+local autoDetect = true
+local hookEnabled = true
+local isMinimized = false
+local customAmount = 0 -- Nilai custom untuk jumlah hero (bisa negatif)
 
------- STATE MANAGEMENT ------
-local State = {
-    jumpID = nil,
-    landingID = nil,
-    winID = nil,
-    magicTokenID = nil,
-    isReady = false,
-    running = false,
-    autoWinEnabled = false,
-    autoTokenEnabled = false,
-    runTime = 0,
-    lastLoopTime = 0,
-    nextLoopTime = 0,
-    lastWinTime = 0,
-    hookEnabled = true,
-    climbSpeed = 0,
-    climbing = false,
-    climbStartY = 0,
-    climbStartTime = 0,
-    maxY = 0,
-    lockDelay = false,
-    currentDelay = DEFAULT_DELAY,
-    currentHeight = DEFAULT_HEIGHT
+--// GUI
+local MainFrame = Instance.new("ScreenGui")
+MainFrame.Name = "DrawHeroLoopGUI"
+MainFrame.Parent = playerGui
+MainFrame.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 380, 0, 200)
+Frame.Position = UDim2.new(0.5, -190, 0.5, -100)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Frame.BackgroundTransparency = 0.2
+Frame.Parent = MainFrame
+Frame.Draggable = true
+Frame.Active = true
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 6)
+UICorner.Parent = Frame
+
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 20)
+TitleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TitleBar.BackgroundTransparency = 0.3
+TitleBar.Parent = Frame
+
+local TitleBarCorner = Instance.new("UICorner")
+TitleBarCorner.CornerRadius = UDim.new(0, 6)
+TitleBarCorner.Parent = TitleBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -70, 1, 0)
+Title.Position = UDim2.new(0, 5, 0, 0)
+Title.Text = "AUTO HATCH"
+Title.TextColor3 = Color3.fromRGB(220, 220, 220)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.SourceSans
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+-- Minimize Button
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Size = UDim2.new(0, 20, 0, 20)
+MinimizeButton.Position = UDim2.new(1, -45, 0, 0)
+MinimizeButton.Text = "−"
+MinimizeButton.Font = Enum.Font.SourceSans
+MinimizeButton.TextSize = 16
+MinimizeButton.TextColor3 = Color3.fromRGB(220, 220, 220)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+MinimizeButton.BackgroundTransparency = 0.3
+MinimizeButton.BorderSizePixel = 0
+MinimizeButton.Parent = TitleBar
+
+local MinimizeCorner = Instance.new("UICorner")
+MinimizeCorner.CornerRadius = UDim.new(0, 4)
+MinimizeCorner.Parent = MinimizeButton
+
+-- Close Button
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 20, 0, 20)
+CloseButton.Position = UDim2.new(1, -22, 0, 0)
+CloseButton.Text = "✕"
+CloseButton.Font = Enum.Font.SourceSans
+CloseButton.TextSize = 14
+CloseButton.TextColor3 = Color3.fromRGB(220, 220, 220)
+CloseButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+CloseButton.BackgroundTransparency = 0.3
+CloseButton.BorderSizePixel = 0
+CloseButton.Parent = TitleBar
+
+local CloseButtonCorner = Instance.new("UICorner")
+CloseButtonCorner.CornerRadius = UDim.new(0, 4)
+CloseButtonCorner.Parent = CloseButton
+
+-- Content Frame
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, 0, 1, -20)
+ContentFrame.Position = UDim2.new(0, 0, 0, 20)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = Frame
+
+-- Status Label
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -10, 0, 15)
+StatusLabel.Position = UDim2.new(0, 5, 1, -180)
+StatusLabel.Text = "Status: Siap..."
+StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Font = Enum.Font.SourceSans
+StatusLabel.TextSize = 11
+StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+StatusLabel.Parent = ContentFrame
+
+-- Draw Count Label
+local DrawLabel = Instance.new("TextLabel")
+DrawLabel.Size = UDim2.new(0.15, -5, 0, 18)
+DrawLabel.Position = UDim2.new(0, 5, 1, -160)
+DrawLabel.Text = "Draw:"
+DrawLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+DrawLabel.BackgroundTransparency = 1
+DrawLabel.Font = Enum.Font.SourceSans
+DrawLabel.TextSize = 11
+DrawLabel.TextXAlignment = Enum.TextXAlignment.Right
+DrawLabel.Parent = ContentFrame
+
+-- Draw Count Buttons
+local DrawButtonFrame = Instance.new("Frame")
+DrawButtonFrame.Size = UDim2.new(0.5, -10, 0, 18)
+DrawButtonFrame.Position = UDim2.new(0.18, 0, 1, -160)
+DrawButtonFrame.BackgroundTransparency = 1
+DrawButtonFrame.Parent = ContentFrame
+
+local Draw1Button = Instance.new("TextButton")
+Draw1Button.Size = UDim2.new(0.3, -3, 1, 0)
+Draw1Button.Position = UDim2.new(0, 0, 0, 0)
+Draw1Button.Text = "1x"
+Draw1Button.Font = Enum.Font.SourceSans
+Draw1Button.TextSize = 11
+Draw1Button.TextColor3 = Color3.fromRGB(220, 220, 220)
+Draw1Button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Draw1Button.BackgroundTransparency = 0.3
+Draw1Button.BorderSizePixel = 0
+Draw1Button.Parent = DrawButtonFrame
+
+local Draw1Corner = Instance.new("UICorner")
+Draw1Corner.CornerRadius = UDim.new(0, 4)
+Draw1Corner.Parent = Draw1Button
+
+local Draw3Button = Instance.new("TextButton")
+Draw3Button.Size = UDim2.new(0.3, -3, 1, 0)
+Draw3Button.Position = UDim2.new(0.35, 0, 0, 0)
+Draw3Button.Text = "3x"
+Draw3Button.Font = Enum.Font.SourceSans
+Draw3Button.TextSize = 11
+Draw3Button.TextColor3 = Color3.fromRGB(220, 220, 220)
+Draw3Button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Draw3Button.BackgroundTransparency = 0.3
+Draw3Button.BorderSizePixel = 0
+Draw3Button.Parent = DrawButtonFrame
+
+local Draw3Corner = Instance.new("UICorner")
+Draw3Corner.CornerRadius = UDim.new(0, 4)
+Draw3Corner.Parent = Draw3Button
+
+local Draw10Button = Instance.new("TextButton")
+Draw10Button.Size = UDim2.new(0.3, -3, 1, 0)
+Draw10Button.Position = UDim2.new(0.7, 0, 0, 0)
+Draw10Button.Text = "10x"
+Draw10Button.Font = Enum.Font.SourceSans
+Draw10Button.TextSize = 11
+Draw10Button.TextColor3 = Color3.fromRGB(220, 220, 220)
+Draw10Button.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+Draw10Button.BackgroundTransparency = 0.3
+Draw10Button.BorderSizePixel = 0
+Draw10Button.Parent = DrawButtonFrame
+
+local Draw10Corner = Instance.new("UICorner")
+Draw10Corner.CornerRadius = UDim.new(0, 4)
+Draw10Corner.Parent = Draw10Button
+
+-- Auto Detect Toggle
+local AutoDetectButton = Instance.new("TextButton")
+AutoDetectButton.Size = UDim2.new(0.18, -5, 0, 18)
+AutoDetectButton.Position = UDim2.new(0.7, 0, 1, -160)
+AutoDetectButton.Text = "Auto: ON"
+AutoDetectButton.Font = Enum.Font.SourceSans
+AutoDetectButton.TextSize = 10
+AutoDetectButton.TextColor3 = Color3.fromRGB(220, 220, 220)
+AutoDetectButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+AutoDetectButton.BackgroundTransparency = 0.3
+AutoDetectButton.BorderSizePixel = 0
+AutoDetectButton.Parent = ContentFrame
+
+local AutoDetectCorner = Instance.new("UICorner")
+AutoDetectCorner.CornerRadius = UDim.new(0, 4)
+AutoDetectCorner.Parent = AutoDetectButton
+
+-- ID
+local IdLabel = Instance.new("TextLabel")
+IdLabel.Size = UDim2.new(0.12, -5, 0, 18)
+IdLabel.Position = UDim2.new(0, 5, 1, -138)
+IdLabel.Text = "ID:"
+IdLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+IdLabel.BackgroundTransparency = 1
+IdLabel.Font = Enum.Font.SourceSans
+IdLabel.TextSize = 11
+IdLabel.TextXAlignment = Enum.TextXAlignment.Right
+IdLabel.Parent = ContentFrame
+
+local IdBox = Instance.new("TextBox")
+IdBox.Size = UDim2.new(0.35, -10, 0, 18)
+IdBox.Position = UDim2.new(0.15, 0, 1, -138)
+IdBox.Text = tostring(heroId)
+IdBox.PlaceholderText = "Hero ID"
+IdBox.TextColor3 = Color3.fromRGB(220, 220, 220)
+IdBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+IdBox.BackgroundTransparency = 0.3
+IdBox.Font = Enum.Font.SourceSans
+IdBox.TextSize = 11
+IdBox.Parent = ContentFrame
+
+local IdBoxCorner = Instance.new("UICorner")
+IdBoxCorner.CornerRadius = UDim.new(0, 4)
+IdBoxCorner.Parent = IdBox
+
+local DetectNowButton = Instance.new("TextButton")
+DetectNowButton.Size = UDim2.new(0.2, -5, 0, 18)
+DetectNowButton.Position = UDim2.new(0.53, 0, 1, -138)
+DetectNowButton.Text = "Detect!"
+DetectNowButton.Font = Enum.Font.SourceSans
+DetectNowButton.TextSize = 11
+DetectNowButton.TextColor3 = Color3.fromRGB(220, 220, 220)
+DetectNowButton.BackgroundColor3 = Color3.fromRGB(40, 80, 180)
+DetectNowButton.BackgroundTransparency = 0.3
+DetectNowButton.BorderSizePixel = 0
+DetectNowButton.Parent = ContentFrame
+
+local DetectNowCorner = Instance.new("UICorner")
+DetectNowCorner.CornerRadius = UDim.new(0, 4)
+DetectNowCorner.Parent = DetectNowButton
+
+-- Delay
+local DelayLabel = Instance.new("TextLabel")
+DelayLabel.Size = UDim2.new(0.12, -5, 0, 18)
+DelayLabel.Position = UDim2.new(0, 5, 1, -116)
+DelayLabel.Text = "Delay:"
+DelayLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+DelayLabel.BackgroundTransparency = 1
+DelayLabel.Font = Enum.Font.SourceSans
+DelayLabel.TextSize = 11
+DelayLabel.TextXAlignment = Enum.TextXAlignment.Right
+DelayLabel.Parent = ContentFrame
+
+local DelayBox = Instance.new("TextBox")
+DelayBox.Size = UDim2.new(0.2, -10, 0, 18)
+DelayBox.Position = UDim2.new(0.15, 0, 1, -116)
+DelayBox.Text = tostring(delayTime)
+DelayBox.PlaceholderText = "Delay"
+DelayBox.TextColor3 = Color3.fromRGB(220, 220, 220)
+DelayBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+DelayBox.BackgroundTransparency = 0.3
+DelayBox.Font = Enum.Font.SourceSans
+DelayBox.TextSize = 11
+DelayBox.Parent = ContentFrame
+
+local DelayBoxCorner = Instance.new("UICorner")
+DelayBoxCorner.CornerRadius = UDim.new(0, 4)
+DelayBoxCorner.Parent = DelayBox
+
+local StartStopButton = Instance.new("TextButton")
+StartStopButton.Size = UDim2.new(0.45, -10, 0, 18)
+StartStopButton.Position = UDim2.new(0.38, 0, 1, -116)
+StartStopButton.Text = "Start"
+StartStopButton.Font = Enum.Font.SourceSans
+StartStopButton.TextSize = 11
+StartStopButton.TextColor3 = Color3.fromRGB(220, 220, 220)
+StartStopButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+StartStopButton.BackgroundTransparency = 0.3
+StartStopButton.BorderSizePixel = 0
+StartStopButton.Parent = ContentFrame
+
+local StartStopCorner = Instance.new("UICorner")
+StartStopCorner.CornerRadius = UDim.new(0, 4)
+StartStopCorner.Parent = StartStopButton
+
+-- ID Detected Label
+local IdDetectedLabel = Instance.new("TextLabel")
+IdDetectedLabel.Size = UDim2.new(1, -10, 0, 15)
+IdDetectedLabel.Position = UDim2.new(0, 5, 1, -96)
+IdDetectedLabel.Text = "ID Terdeteksi: -"
+IdDetectedLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+IdDetectedLabel.BackgroundTransparency = 1
+IdDetectedLabel.Font = Enum.Font.SourceSans
+IdDetectedLabel.TextSize = 11
+IdDetectedLabel.TextXAlignment = Enum.TextXAlignment.Left
+IdDetectedLabel.Parent = ContentFrame
+
+-- Draw Count Display
+local DrawCountDisplay = Instance.new("TextLabel")
+DrawCountDisplay.Size = UDim2.new(1, -10, 0, 15)
+DrawCountDisplay.Position = UDim2.new(0, 5, 1, -78)
+DrawCountDisplay.Text = "Draw: 10x"
+DrawCountDisplay.TextColor3 = Color3.fromRGB(100, 200, 100)
+DrawCountDisplay.BackgroundTransparency = 1
+DrawCountDisplay.Font = Enum.Font.SourceSans
+DrawCountDisplay.TextSize = 11
+DrawCountDisplay.TextXAlignment = Enum.TextXAlignment.Center
+DrawCountDisplay.Parent = ContentFrame
+
+-- === FITUR CUSTOM JUMLAH HERO (NEGATIF) ===
+local CustomLabel = Instance.new("TextLabel")
+CustomLabel.Size = UDim2.new(0.15, -5, 0, 18)
+CustomLabel.Position = UDim2.new(0, 5, 1, -56)
+CustomLabel.Text = "-Hero:"
+CustomLabel.TextColor3 = Color3.fromRGB(255, 100, 100) -- Warna merah untuk negatif
+CustomLabel.BackgroundTransparency = 1
+CustomLabel.Font = Enum.Font.SourceSans
+CustomLabel.TextSize = 11
+CustomLabel.TextXAlignment = Enum.TextXAlignment.Right
+CustomLabel.Parent = ContentFrame
+
+-- Frame untuk custom amount
+local CustomFrame = Instance.new("Frame")
+CustomFrame.Size = UDim2.new(0.65, -10, 0, 24)
+CustomFrame.Position = UDim2.new(0.18, 0, 1, -58)
+CustomFrame.BackgroundTransparency = 1
+CustomFrame.Parent = ContentFrame
+
+-- TextBox untuk input custom (otomatis negatif)
+local CustomBox = Instance.new("TextBox")
+CustomBox.Size = UDim2.new(0.55, -5, 1, 0)
+CustomBox.Position = UDim2.new(0, 0, 0, 0)
+CustomBox.Text = "0"
+CustomBox.PlaceholderText = "Jumlah Hero (-)"
+CustomBox.TextColor3 = Color3.fromRGB(255, 150, 150) -- Warna merah
+CustomBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+CustomBox.BackgroundTransparency = 0.3
+CustomBox.Font = Enum.Font.SourceSans
+CustomBox.TextSize = 11
+CustomBox.Parent = CustomFrame
+
+local CustomBoxCorner = Instance.new("UICorner")
+CustomBoxCorner.CornerRadius = UDim.new(0, 4)
+CustomBoxCorner.Parent = CustomBox
+
+-- Tombol Up (menambah nilai negatif, contoh: -1 -> -2)
+local UpButton = Instance.new("TextButton")
+UpButton.Size = UDim2.new(0.07, 0, 0.5, 0)
+UpButton.Position = UDim2.new(0.57, 0, 0, 0)
+UpButton.Text = "▲"
+UpButton.Font = Enum.Font.SourceSans
+UpButton.TextSize = 10
+UpButton.TextColor3 = Color3.fromRGB(220, 220, 220)
+UpButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+UpButton.BackgroundTransparency = 0.3
+UpButton.BorderSizePixel = 0
+UpButton.Parent = CustomFrame
+
+local UpCorner = Instance.new("UICorner")
+UpCorner.CornerRadius = UDim.new(0, 3)
+UpCorner.Parent = UpButton
+
+-- Tombol Down (mengurangi nilai negatif, contoh: -1 -> 0)
+local DownButton = Instance.new("TextButton")
+DownButton.Size = UDim2.new(0.07, 0, 0.5, 0)
+DownButton.Position = UDim2.new(0.57, 0, 0.5, 0)
+DownButton.Text = "▼"
+DownButton.Font = Enum.Font.SourceSans
+DownButton.TextSize = 10
+DownButton.TextColor3 = Color3.fromRGB(220, 220, 220)
+DownButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+DownButton.BackgroundTransparency = 0.3
+DownButton.BorderSizePixel = 0
+DownButton.Parent = CustomFrame
+
+local DownCorner = Instance.new("UICorner")
+DownCorner.CornerRadius = UDim.new(0, 3)
+DownCorner.Parent = DownButton
+
+-- Tombol Kelipatan NEGATIF (1K-, 1M-, 1T-, 1B-)
+local MultiplierFrame = Instance.new("Frame")
+MultiplierFrame.Size = UDim2.new(0.3, -5, 0.8, 0)
+MultiplierFrame.Position = UDim2.new(0.66, 0, 0.1, 0)
+MultiplierFrame.BackgroundTransparency = 1
+MultiplierFrame.Parent = CustomFrame
+
+local MultiplierButtons = {}
+local multipliers = {
+    {name = "1K-", value = -1000},
+    {name = "1M-", value = -1000000},
+    {name = "1T-", value = -1000000000},
+    {name = "1B-", value = -1000000000000}
 }
 
------- FUNGSI UTILITY ------
-local function GetWinDelay()
-    return State.climbSpeed > 0 and (WIN_DELAY_BASE / State.climbSpeed) or 20
-end
-
-local function CalculateHeight(speed, delay)
-    local calculatedHeight = math.floor((speed * HEIGHT_MULTIPLIER) * delay)
-    return math.min(calculatedHeight, MAX_HEIGHT)
-end
-
-local function GetAutoTokenDelay(speed)
-    if speed > 0 then
-        return math.floor((10000 / speed) * 10) / 10
-    end
-    return DEFAULT_DELAY
-end
-
------- FUNGSI REMOTE EVENT ------
-local function SendRemoteEvent(eventName, ...)
-    local args = {eventName, ...}
-    ReplicatedStorage:WaitForChild("ProMgs"):WaitForChild("RemoteEvent"):FireServer(unpack(args))
-end
-
-local function SendJumpData(jumpID, height)
-    if jumpID then
-        SendRemoteEvent("JumpResults", jumpID, height)
-    end
-end
-
-local function SendLandingData(landingID)
-    if landingID then
-        SendRemoteEvent("LandingResults", landingID)
-    end
-end
-
-local function SendWinData(winID)
-    if winID then
-        SendRemoteEvent("ClaimRooftopWinsReward", winID)
-        State.lastWinTime = os.time()
-    end
-end
-
-local function SendTokenData(magicTokenID)
-    if magicTokenID then
-        SendRemoteEvent("ClaimRooftopMagicToken", magicTokenID)
-    end
-end
-
------- FUNGSI CORE LOGIC ------
-local function ProcessCoinActions()
-    local height = CalculateHeight(State.climbSpeed, State.currentDelay)
-    SendJumpData(State.jumpID, height)
-    SendLandingData(State.landingID)
-end
-
-local function ProcessAutoToken()
-    if State.autoTokenEnabled and State.magicTokenID then
-        local tokenTime = State.lastLoopTime + (State.currentDelay / 2)
-        while os.time() < tokenTime and State.running and State.hookEnabled do
-            task.wait(0.1)
-        end
-        if State.running and State.hookEnabled then
-            SendTokenData(State.magicTokenID)
-        end
-    end
-end
-
-local function ProcessAutoWin()
-    local currentWinDelay = GetWinDelay()
-    if State.autoWinEnabled and os.time() - State.lastWinTime >= currentWinDelay then
-        SendWinData(State.winID)
-    end
-end
-
-local function HandleAutoPause()
-    State.runTime = State.runTime + (os.time() - State.lastLoopTime)
-    if State.runTime >= PAUSE_INTERVAL then
-        State.running = false
-        task.wait(PAUSE_DURATION)
-        State.runTime = 0
-        State.running = true
-        return true
-    end
-    return false
-end
-
-local function RunLoop()
-    while State.running and State.hookEnabled do
-        if State.autoTokenEnabled and State.climbSpeed > 0 and not State.lockDelay then
-            State.currentDelay = GetAutoTokenDelay(State.climbSpeed)
-            UpdateMonitor()
-        end
-        
-        State.lastLoopTime = os.time()
-        State.nextLoopTime = State.lastLoopTime + State.currentDelay
-        
-        ProcessAutoToken()
-        ProcessAutoWin()
-        
-        while os.time() < State.nextLoopTime and State.running and State.hookEnabled do
-            local remaining = State.nextLoopTime - os.time()
-            UpdateMonitor()
-            task.wait(0.1)
-        end
-        
-        if not State.running or not State.hookEnabled then break end
-        
-        ProcessCoinActions()
-        
-        if HandleAutoPause() then
-            break
-        end
-    end
+for i, mult in ipairs(multipliers) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.23, -2, 1, 0)
+    btn.Position = UDim2.new((i-1) * 0.25, 0, 0, 0)
+    btn.Text = mult.name
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 9
+    btn.TextColor3 = Color3.fromRGB(255, 150, 150) -- Warna merah
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.BackgroundTransparency = 0.3
+    btn.BorderSizePixel = 0
+    btn.Parent = MultiplierFrame
     
-    if State.hookEnabled then
-        UpdateMonitor()
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 3)
+    btnCorner.Parent = btn
+    
+    MultiplierButtons[mult.name] = btn
+end
+
+-- Mini Button
+local MiniButton = Instance.new("TextButton")
+MiniButton.Size = UDim2.new(0, 40, 0, 40)
+MiniButton.Position = UDim2.new(1, -50, 1, -50)
+MiniButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+MiniButton.Text = "⤴"
+MiniButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MiniButton.Font = Enum.Font.SourceSans
+MiniButton.TextSize = 20
+MiniButton.Visible = false
+MiniButton.Parent = MainFrame
+
+local MiniCorner = Instance.new("UICorner")
+MiniCorner.CornerRadius = UDim.new(0, 20)
+MiniCorner.Parent = MiniButton
+
+--// Variables
+local running = false
+local coroutineLoop = nil
+local DrawHeroEvent = nil
+local oldNamecall = nil
+
+--// Fungsi untuk format angka
+local function FormatNumber(num)
+    local absNum = math.abs(num)
+    local sign = num < 0 and "-" or ""
+    
+    if absNum >= 1000000000000 then
+        return sign .. string.format("%.2fB", absNum/1000000000000)
+    elseif absNum >= 1000000000 then
+        return sign .. string.format("%.2fT", absNum/1000000000)
+    elseif absNum >= 1000000 then
+        return sign .. string.format("%.2fM", absNum/1000000)
+    elseif absNum >= 1000 then
+        return sign .. string.format("%.2fK", absNum/1000)
+    else
+        return sign .. tostring(absNum)
     end
 end
 
------- FUNGSI CLIMB SPEED ------
-local function TrackClimbingState(char)
-    local humanoid = char:WaitForChild("Humanoid")
+--// Fungsi untuk update custom amount (selalu negatif)
+local function UpdateCustomAmount(value)
+    -- Pastikan nilai selalu negatif atau 0
+    local newValue = math.min(0, value) -- Hanya 0 atau negatif
+    newValue = math.max(-999999999999, newValue) -- Batas minimum
+    customAmount = newValue
+    CustomBox.Text = tostring(customAmount)
     
-    humanoid.StateChanged:Connect(function(_, new)
-        if new == Enum.HumanoidStateType.Climbing then
-            State.climbStartY = char:WaitForChild("HumanoidRootPart").Position.Y
-            State.climbStartTime = tick()
-            State.maxY = State.climbStartY
-            State.climbing = true
-        else
-            if State.climbing then
-                local climbEndY = State.maxY
-                local climbEndTime = tick()
-                local totalY = climbEndY - State.climbStartY
-                local totalTime = climbEndTime - State.climbStartTime
-                
-                if totalY > 0 and totalTime > 0 then
-                    State.climbSpeed = totalY / totalTime
-                    if not State.lockDelay then
-                        State.currentHeight = CalculateHeight(State.climbSpeed, State.currentDelay)
-                        if State.autoTokenEnabled then
-                            State.currentDelay = GetAutoTokenDelay(State.climbSpeed)
-                        end
-                        UpdateMonitor()
-                    end
-                end
-                State.climbing = false
+    -- Update status
+    if customAmount < 0 then
+        StatusLabel.Text = "📊 Custom: " .. FormatNumber(customAmount)
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100) -- Warna merah
+    elseif customAmount == 0 then
+        StatusLabel.Text = "📊 Custom: 0 (menggunakan Draw)"
+        StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    end
+end
+
+--// Event untuk Custom Box
+CustomBox.FocusLost:Connect(function(enterPressed)
+    local value = tonumber(CustomBox.Text)
+    if value ~= nil then
+        -- Pastikan negatif
+        UpdateCustomAmount(value)
+    else
+        CustomBox.Text = tostring(customAmount)
+    end
+end)
+
+--// Event untuk Up Button (nilai semakin negatif)
+local upHold = false
+local upCoroutine = nil
+
+UpButton.MouseButton1Down:Connect(function()
+    upHold = true
+    UpdateCustomAmount(customAmount - 1) -- Kurangi 1 (lebih negatif)
+    
+    upCoroutine = coroutine.wrap(function()
+        while upHold do
+            task.wait(0.1)
+            if upHold then
+                UpdateCustomAmount(customAmount - 1)
             end
         end
     end)
+    upCoroutine()
+end)
+
+UpButton.MouseButton1Up:Connect(function()
+    upHold = false
+end)
+
+UpButton.MouseLeave:Connect(function()
+    upHold = false
+end)
+
+--// Event untuk Down Button (nilai mendekati 0)
+local downHold = false
+local downCoroutine = nil
+
+DownButton.MouseButton1Down:Connect(function()
+    downHold = true
+    UpdateCustomAmount(customAmount + 1) -- Tambah 1 (mendekati 0)
     
-    RunService.Heartbeat:Connect(function()
-        if State.climbing and char:FindFirstChild("HumanoidRootPart") then
-            local y = char.HumanoidRootPart.Position.Y
-            if y > State.maxY then
-                State.maxY = y
+    downCoroutine = coroutine.wrap(function()
+        while downHold do
+            task.wait(0.1)
+            if downHold then
+                UpdateCustomAmount(customAmount + 1)
             end
+        end
+    end)
+    downCoroutine()
+end)
+
+DownButton.MouseButton1Up:Connect(function()
+    downHold = false
+end)
+
+DownButton.MouseLeave:Connect(function()
+    downHold = false
+end)
+
+--// Event untuk Multiplier Buttons (semua negatif)
+for name, btn in pairs(MultiplierButtons) do
+    btn.MouseButton1Click:Connect(function()
+        local multValue = 0
+        if name == "1K-" then multValue = -1000
+        elseif name == "1M-" then multValue = -1000000
+        elseif name == "1T-" then multValue = -1000000000
+        elseif name == "1B-" then multValue = -1000000000000
+        end
+        
+        UpdateCustomAmount(customAmount + multValue) -- Tambahkan nilai negatif
+    end)
+    
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    end)
+end
+
+--// Function to update draw button states
+local function UpdateDrawButtons(selected)
+    Draw1Button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    Draw3Button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    Draw10Button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+
+    if selected == 1 then
+        Draw1Button.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+        DrawCountDisplay.Text = "Draw: 1x"
+        drawCount = 1
+    elseif selected == 3 then
+        Draw3Button.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+        DrawCountDisplay.Text = "Draw: 3x"
+        drawCount = 3
+    elseif selected == 10 then
+        Draw10Button.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+        DrawCountDisplay.Text = "Draw: 10x"
+        drawCount = 10
+    end
+end
+
+--// Draw button events
+Draw1Button.MouseButton1Click:Connect(function()
+    UpdateDrawButtons(1)
+end)
+
+Draw3Button.MouseButton1Click:Connect(function()
+    UpdateDrawButtons(3)
+end)
+
+Draw10Button.MouseButton1Click:Connect(function()
+    UpdateDrawButtons(10)
+end)
+
+-- Button hover effects
+local function SetupDrawButtonHover(button)
+    button.MouseEnter:Connect(function()
+        if button.BackgroundColor3 ~= Color3.fromRGB(40, 180, 40) then
+            button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        end
+    end)
+    button.MouseLeave:Connect(function()
+        if button.BackgroundColor3 ~= Color3.fromRGB(40, 180, 40) then
+            button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
         end
     end)
 end
 
------- FUNGSI REMOTE HOOK ------
+SetupDrawButtonHover(Draw1Button)
+SetupDrawButtonHover(Draw3Button)
+SetupDrawButtonHover(Draw10Button)
+
+--// Get DrawHero Event
+local function GetDrawHeroEvent()
+    local success, event = pcall(function()
+        return ReplicatedStorage:WaitForChild("Tool"):WaitForChild("DrawUp"):WaitForChild("Msg"):WaitForChild("DrawHero")
+    end)
+    if success and event then
+        return event
+    end
+    return nil
+end
+
+--// HOOK METAMETHOD
 local function InitializeRemoteHook()
-    local remoteEvent = ReplicatedStorage:WaitForChild("ProMgs"):WaitForChild("RemoteEvent")
-    local oldNamecall
-    
+    DrawHeroEvent = GetDrawHeroEvent()
+
+    if not DrawHeroEvent then
+        StatusLabel.Text = "❌ Event DrawHero tidak ditemukan!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+        return false
+    end
+
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        if not State.hookEnabled then
+        if not hookEnabled then
             return oldNamecall(self, ...)
         end
-        
+
         local args = {...}
         local method = getnamecallmethod()
 
-        if self == remoteEvent and method == "FireServer" then
-            local eventType = args[1]
-            local eventID = args[2]
-            
-            if typeof(eventID) == "number" then
-                if eventType == "JumpResults" then
-                    State.jumpID = eventID
-                elseif eventType == "LandingResults" then
-                    State.landingID = eventID
-                elseif eventType == "ClaimRooftopWinsReward" then
-                    State.winID = eventID
-                elseif eventType == "ClaimRooftopMagicToken" then
-                    State.magicTokenID = eventID
+        if self == DrawHeroEvent and method == "InvokeServer" then
+            if #args >= 1 then
+                local id = args[1]
+                if type(id) == "number" and id > 0 then
+                    if id ~= heroId then
+                        heroId = id
+                        IdBox.Text = tostring(heroId)
+                        IdDetectedLabel.Text = "✅ ID Terdeteksi: " .. heroId
+                        IdDetectedLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                        StatusLabel.Text = "🎯 ID terdeteksi: " .. heroId
+                        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                    end
                 end
-                UpdateMonitor()
             end
         end
 
         return oldNamecall(self, ...)
     end)
+
+    StatusLabel.Text = "✅ Hook aktif. Menunggu InvokeServer..."
+    StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    return true
 end
 
------- FUNGSI GUI - MONITOR ------
-local function CreateMonitor()
-    local player = Players.LocalPlayer
-    local playerGui = player:WaitForChild("PlayerGui")
-    
-    if playerGui:FindFirstChild("CoinMonitor") then
-        playerGui:FindFirstChild("CoinMonitor"):Destroy()
-    end
-
-    local MonitorGui = Instance.new("ScreenGui")
-    MonitorGui.Name = "CoinMonitor"
-    MonitorGui.Parent = playerGui
-    MonitorGui.ResetOnSpawn = false
-    MonitorGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-    local MonitorFrame = Instance.new("Frame")
-    MonitorFrame.Size = UDim2.new(0, 250, 0, 180)
-    MonitorFrame.Position = UDim2.new(0, 10, 0, 10)
-    MonitorFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    MonitorFrame.BackgroundTransparency = 0.15
-    MonitorFrame.BorderSizePixel = 0
-    MonitorFrame.Parent = MonitorGui
-    MonitorFrame.Draggable = true
-    MonitorFrame.Active = true
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 10)
-    Corner.Parent = MonitorFrame
-
-    local TitleBar = Instance.new("Frame")
-    TitleBar.Size = UDim2.new(1, 0, 0, 30)
-    TitleBar.Position = UDim2.new(0, 0, 0, 0)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    TitleBar.BorderSizePixel = 0
-    TitleBar.Parent = MonitorFrame
-
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 10, 0, 0)
-    TitleCorner.Parent = TitleBar
-
-    local TitleText = Instance.new("TextLabel")
-    TitleText.Size = UDim2.new(0.7, 0, 1, 0)
-    TitleText.Position = UDim2.new(0.15, 0, 0, 0)
-    TitleText.Text = "📊 COIN MONITOR"
-    TitleText.TextColor3 = Color3.new(1, 1, 1)
-    TitleText.BackgroundTransparency = 1
-    TitleText.Font = Enum.Font.GothamBold
-    TitleText.TextSize = 14
-    TitleText.Parent = TitleBar
-
-    local Content = Instance.new("Frame")
-    Content.Name = "Content"
-    Content.Size = UDim2.new(1, -20, 1, -40)
-    Content.Position = UDim2.new(0, 10, 0, 35)
-    Content.BackgroundTransparency = 1
-    Content.Parent = MonitorFrame
-
-    -- Status Bar
-    local StatusBar = Instance.new("Frame")
-    StatusBar.Size = UDim2.new(1, 0, 0, 25)
-    StatusBar.Position = UDim2.new(0, 0, 0, 0)
-    StatusBar.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    StatusBar.BorderSizePixel = 0
-    StatusBar.Parent = Content
-
-    local StatusCorner = Instance.new("UICorner")
-    StatusCorner.CornerRadius = UDim.new(0, 6)
-    StatusCorner.Parent = StatusBar
-
-    local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Size = UDim2.new(1, 0, 1, 0)
-    StatusLabel.Text = "Coin[○] Win[○] Token[○]"
-    StatusLabel.TextColor3 = Color3.new(1, 1, 1)
-    StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Font = Enum.Font.Gotham
-    StatusLabel.TextSize = 12
-    StatusLabel.TextXAlignment = Enum.TextXAlignment.Center
-    StatusLabel.Parent = StatusBar
-
-    -- Speed & Info
-    local InfoFrame = Instance.new("Frame")
-    InfoFrame.Size = UDim2.new(1, 0, 0, 50)
-    InfoFrame.Position = UDim2.new(0, 0, 0, 30)
-    InfoFrame.BackgroundTransparency = 1
-    InfoFrame.Parent = Content
-
-    local SpeedLabel = Instance.new("TextLabel")
-    SpeedLabel.Size = UDim2.new(0.5, 0, 0, 20)
-    SpeedLabel.Position = UDim2.new(0, 0, 0, 0)
-    SpeedLabel.Text = "Speed: 0.0"
-    SpeedLabel.TextColor3 = Color3.new(1, 1, 1)
-    SpeedLabel.BackgroundTransparency = 1
-    SpeedLabel.Font = Enum.Font.Gotham
-    SpeedLabel.TextSize = 12
-    SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-    SpeedLabel.Parent = InfoFrame
-
-    local DelayLabel = Instance.new("TextLabel")
-    DelayLabel.Size = UDim2.new(0.5, 0, 0, 20)
-    DelayLabel.Position = UDim2.new(0.5, 0, 0, 0)
-    DelayLabel.Text = "Delay: 5.0s"
-    DelayLabel.TextColor3 = Color3.new(1, 1, 1)
-    DelayLabel.BackgroundTransparency = 1
-    DelayLabel.Font = Enum.Font.Gotham
-    DelayLabel.TextSize = 12
-    DelayLabel.TextXAlignment = Enum.TextXAlignment.Left
-    DelayLabel.Parent = InfoFrame
-
-    local HeightLabel = Instance.new("TextLabel")
-    HeightLabel.Size = UDim2.new(0.5, 0, 0, 20)
-    HeightLabel.Position = UDim2.new(0, 0, 0, 22)
-    HeightLabel.Text = "Height: 5000"
-    HeightLabel.TextColor3 = Color3.new(1, 1, 1)
-    HeightLabel.BackgroundTransparency = 1
-    HeightLabel.Font = Enum.Font.Gotham
-    HeightLabel.TextSize = 12
-    HeightLabel.TextXAlignment = Enum.TextXAlignment.Left
-    HeightLabel.Parent = InfoFrame
-
-    local WinDelayLabel = Instance.new("TextLabel")
-    WinDelayLabel.Size = UDim2.new(0.5, 0, 0, 20)
-    WinDelayLabel.Position = UDim2.new(0.5, 0, 0, 22)
-    WinDelayLabel.Text = "Win Delay: 20.0s"
-    WinDelayLabel.TextColor3 = Color3.new(1, 1, 1)
-    WinDelayLabel.BackgroundTransparency = 1
-    WinDelayLabel.Font = Enum.Font.Gotham
-    WinDelayLabel.TextSize = 12
-    WinDelayLabel.TextXAlignment = Enum.TextXAlignment.Left
-    WinDelayLabel.Parent = InfoFrame
-
-    -- Running Status
-    local RunStatus = Instance.new("TextLabel")
-    RunStatus.Size = UDim2.new(1, 0, 0, 20)
-    RunStatus.Position = UDim2.new(0, 0, 0, 85)
-    RunStatus.Text = "⏸️ STOPPED"
-    RunStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-    RunStatus.BackgroundTransparency = 1
-    RunStatus.Font = Enum.Font.GothamBold
-    RunStatus.TextSize = 13
-    RunStatus.TextXAlignment = Enum.TextXAlignment.Center
-    RunStatus.Parent = Content
-
-    -- Progress Bar
-    local ProgressFrame = Instance.new("Frame")
-    ProgressFrame.Size = UDim2.new(1, 0, 0, 10)
-    ProgressFrame.Position = UDim2.new(0, 0, 0, 110)
-    ProgressFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    ProgressFrame.BorderSizePixel = 0
-    ProgressFrame.Parent = Content
-
-    local ProgressCorner = Instance.new("UICorner")
-    ProgressCorner.CornerRadius = UDim.new(0, 5)
-    ProgressCorner.Parent = ProgressFrame
-
-    local ProgressBar = Instance.new("Frame")
-    ProgressBar.Size = UDim2.new(0, 0, 1, 0)
-    ProgressBar.BackgroundColor3 = Color3.fromRGB(0, 200, 50)
-    ProgressBar.BorderSizePixel = 0
-    ProgressBar.Parent = ProgressFrame
-
-    local ProgressCorner2 = Instance.new("UICorner")
-    ProgressCorner2.CornerRadius = UDim.new(0, 5)
-    ProgressCorner2.Parent = ProgressBar
-
-    return {
-        MonitorGui = MonitorGui,
-        StatusLabel = StatusLabel,
-        SpeedLabel = SpeedLabel,
-        DelayLabel = DelayLabel,
-        HeightLabel = HeightLabel,
-        WinDelayLabel = WinDelayLabel,
-        RunStatus = RunStatus,
-        ProgressBar = ProgressBar
-    }
+--// Unhook
+local function UnhookRemote()
+    hookEnabled = false
+    oldNamecall = nil
 end
 
------- FUNGSI GUI - KONTROL ------
-local function CreateControls()
-    local player = Players.LocalPlayer
-    local playerGui = player:WaitForChild("PlayerGui")
-    
-    if playerGui:FindFirstChild("CoinControls") then
-        playerGui:FindFirstChild("CoinControls"):Destroy()
-    end
-
-    local ControlGui = Instance.new("ScreenGui")
-    ControlGui.Name = "CoinControls"
-    ControlGui.Parent = playerGui
-    ControlGui.ResetOnSpawn = false
-    ControlGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-    local ControlFrame = Instance.new("Frame")
-    ControlFrame.Size = UDim2.new(0, 220, 0, 280)
-    ControlFrame.Position = UDim2.new(1, -230, 0, 10)
-    ControlFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    ControlFrame.BackgroundTransparency = 0.1
-    ControlFrame.BorderSizePixel = 0
-    ControlFrame.Parent = ControlGui
-    ControlFrame.Draggable = true
-    ControlFrame.Active = true
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 10)
-    Corner.Parent = ControlFrame
-
-    local TitleBar = Instance.new("Frame")
-    TitleBar.Size = UDim2.new(1, 0, 0, 30)
-    TitleBar.Position = UDim2.new(0, 0, 0, 0)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-    TitleBar.BorderSizePixel = 0
-    TitleBar.Parent = ControlFrame
-
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 10, 0, 0)
-    TitleCorner.Parent = TitleBar
-
-    local TitleText = Instance.new("TextLabel")
-    TitleText.Size = UDim2.new(0.7, 0, 1, 0)
-    TitleText.Position = UDim2.new(0.15, 0, 0, 0)
-    TitleText.Text = "🎮 COIN CONTROLS"
-    TitleText.TextColor3 = Color3.new(1, 1, 1)
-    TitleText.BackgroundTransparency = 1
-    TitleText.Font = Enum.Font.GothamBold
-    TitleText.TextSize = 13
-    TitleText.Parent = TitleBar
-
-    -- Close Button
-    local CloseButton = Instance.new("TextButton")
-    CloseButton.Size = UDim2.new(0, 25, 0, 25)
-    CloseButton.Position = UDim2.new(1, -25, 0, 0)
-    CloseButton.Text = "×"
-    CloseButton.Font = Enum.Font.GothamBold
-    CloseButton.TextSize = 16
-    CloseButton.TextColor3 = Color3.new(1, 1, 1)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    CloseButton.Parent = TitleBar
-
-    local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 6)
-    CloseCorner.Parent = CloseButton
-
-    local Content = Instance.new("Frame")
-    Content.Name = "Content"
-    Content.Size = UDim2.new(1, -20, 1, -40)
-    Content.Position = UDim2.new(0, 10, 0, 35)
-    Content.BackgroundTransparency = 1
-    Content.Parent = ControlFrame
-
-    -- Start/Stop Button
-    local MainButton = Instance.new("TextButton")
-    MainButton.Size = UDim2.new(1, 0, 0, 35)
-    MainButton.Position = UDim2.new(0, 0, 0, 0)
-    MainButton.Text = "▶ START"
-    MainButton.Font = Enum.Font.GothamBold
-    MainButton.TextSize = 14
-    MainButton.TextColor3 = Color3.new(1, 1, 1)
-    MainButton.BackgroundColor3 = Color3.fromRGB(0, 150, 50)
-    MainButton.Parent = Content
-
-    local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 8)
-    MainCorner.Parent = MainButton
-
-    -- Toggle Buttons Frame
-    local ToggleFrame = Instance.new("Frame")
-    ToggleFrame.Size = UDim2.new(1, 0, 0, 70)
-    ToggleFrame.Position = UDim2.new(0, 0, 0, 45)
-    ToggleFrame.BackgroundTransparency = 1
-    ToggleFrame.Parent = Content
-
-    -- Auto Win Toggle
-    local WinButton = Instance.new("TextButton")
-    WinButton.Size = UDim2.new(0.48, 0, 0, 30)
-    WinButton.Position = UDim2.new(0, 0, 0, 0)
-    WinButton.Text = "🏆 WIN OFF"
-    WinButton.Font = Enum.Font.Gotham
-    WinButton.TextSize = 11
-    WinButton.TextColor3 = Color3.new(1, 1, 1)
-    WinButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    WinButton.Parent = ToggleFrame
-
-    local WinCorner = Instance.new("UICorner")
-    WinCorner.CornerRadius = UDim.new(0, 6)
-    WinCorner.Parent = WinButton
-
-    -- Auto Token Toggle
-    local TokenButton = Instance.new("TextButton")
-    TokenButton.Size = UDim2.new(0.48, 0, 0, 30)
-    TokenButton.Position = UDim2.new(0.52, 0, 0, 0)
-    TokenButton.Text = "🔮 TOKEN OFF"
-    TokenButton.Font = Enum.Font.Gotham
-    TokenButton.TextSize = 11
-    TokenButton.TextColor3 = Color3.new(1, 1, 1)
-    TokenButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    TokenButton.Parent = ToggleFrame
-
-    local TokenCorner = Instance.new("UICorner")
-    TokenCorner.CornerRadius = UDim.new(0, 6)
-    TokenCorner.Parent = TokenButton
-
-    -- Lock Delay Toggle
-    local LockButton = Instance.new("TextButton")
-    LockButton.Size = UDim2.new(0.48, 0, 0, 30)
-    LockButton.Position = UDim2.new(0, 0, 0, 35)
-    LockButton.Text = "🔒 DELAY UNLOCKED"
-    LockButton.Font = Enum.Font.Gotham
-    LockButton.TextSize = 11
-    LockButton.TextColor3 = Color3.new(1, 1, 1)
-    LockButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    LockButton.Parent = ToggleFrame
-
-    local LockCorner = Instance.new("UICorner")
-    LockCorner.CornerRadius = UDim.new(0, 6)
-    LockCorner.Parent = LockButton
-
-    -- Input Frame
-    local InputFrame = Instance.new("Frame")
-    InputFrame.Size = UDim2.new(1, 0, 0, 75)
-    InputFrame.Position = UDim2.new(0, 0, 0, 120)
-    InputFrame.BackgroundTransparency = 1
-    InputFrame.Parent = Content
-
-    local DelayLabel = Instance.new("TextLabel")
-    DelayLabel.Size = UDim2.new(0.35, 0, 0, 20)
-    DelayLabel.Position = UDim2.new(0, 0, 0, 0)
-    DelayLabel.Text = "Delay (s):"
-    DelayLabel.TextColor3 = Color3.new(1, 1, 1)
-    DelayLabel.BackgroundTransparency = 1
-    DelayLabel.Font = Enum.Font.Gotham
-    DelayLabel.TextSize = 11
-    DelayLabel.TextXAlignment = Enum.TextXAlignment.Left
-    DelayLabel.Parent = InputFrame
-
-    local DelayBox = Instance.new("TextBox")
-    DelayBox.Size = UDim2.new(0.6, 0, 0, 20)
-    DelayBox.Position = UDim2.new(0.4, 0, 0, 0)
-    DelayBox.Text = tostring(DEFAULT_DELAY)
-    DelayBox.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    DelayBox.TextColor3 = Color3.new(1, 1, 1)
-    DelayBox.Font = Enum.Font.Gotham
-    DelayBox.TextSize = 11
-    DelayBox.Parent = InputFrame
-
-    local DelayCorner = Instance.new("UICorner")
-    DelayCorner.CornerRadius = UDim.new(0, 4)
-    DelayCorner.Parent = DelayBox
-
-    local HeightLabel = Instance.new("TextLabel")
-    HeightLabel.Size = UDim2.new(0.35, 0, 0, 20)
-    HeightLabel.Position = UDim2.new(0, 0, 0, 25)
-    HeightLabel.Text = "Height:"
-    HeightLabel.TextColor3 = Color3.new(1, 1, 1)
-    HeightLabel.BackgroundTransparency = 1
-    HeightLabel.Font = Enum.Font.Gotham
-    HeightLabel.TextSize = 11
-    HeightLabel.TextXAlignment = Enum.TextXAlignment.Left
-    HeightLabel.Parent = InputFrame
-
-    local HeightBox = Instance.new("TextBox")
-    HeightBox.Size = UDim2.new(0.6, 0, 0, 20)
-    HeightBox.Position = UDim2.new(0.4, 0, 0, 25)
-    HeightBox.Text = tostring(DEFAULT_HEIGHT)
-    HeightBox.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    HeightBox.TextColor3 = Color3.new(1, 1, 1)
-    HeightBox.Font = Enum.Font.Gotham
-    HeightBox.TextSize = 11
-    HeightBox.Parent = InputFrame
-
-    local HeightCorner = Instance.new("UICorner")
-    HeightCorner.CornerRadius = UDim.new(0, 4)
-    HeightCorner.Parent = HeightBox
-
-    -- Speed Button (Reset)
-    local SpeedButton = Instance.new("TextButton")
-    SpeedButton.Size = UDim2.new(1, 0, 0, 20)
-    SpeedButton.Position = UDim2.new(0, 0, 0, 50)
-    SpeedButton.Text = "🔄 Reset Speed"
-    SpeedButton.Font = Enum.Font.Gotham
-    SpeedButton.TextSize = 11
-    SpeedButton.TextColor3 = Color3.new(1, 1, 1)
-    SpeedButton.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    SpeedButton.Parent = InputFrame
-
-    local SpeedCorner = Instance.new("UICorner")
-    SpeedCorner.CornerRadius = UDim.new(0, 4)
-    SpeedCorner.Parent = SpeedButton
-
-    return {
-        ControlGui = ControlGui,
-        MainButton = MainButton,
-        WinButton = WinButton,
-        TokenButton = TokenButton,
-        LockButton = LockButton,
-        DelayBox = DelayBox,
-        HeightBox = HeightBox,
-        SpeedButton = SpeedButton,
-        CloseButton = CloseButton
-    }
+--// Function to update status
+local function UpdateStatus(text, color)
+    StatusLabel.Text = text
+    StatusLabel.TextColor3 = color or Color3.fromRGB(200, 200, 200)
 end
 
------- FUNGSI UPDATE MONITOR ------
-local Monitor = nil
-local Controls = nil
-
-function UpdateMonitor()
-    if not Monitor then return end
-    
-    local coinIcon = State.jumpID and State.landingID and "●" or "○"
-    local winIcon = State.winID and "●" or "○"
-    local tokenIcon = State.magicTokenID and "●" or "○"
-    
-    Monitor.StatusLabel.Text = string.format("Coin[%s] Win[%s] Token[%s]", coinIcon, winIcon, tokenIcon)
-    Monitor.SpeedLabel.Text = string.format("Speed: %.1f", State.climbSpeed)
-    Monitor.DelayLabel.Text = string.format("Delay: %.1fs", State.currentDelay)
-    Monitor.HeightLabel.Text = string.format("Height: %d", State.currentHeight)
-    Monitor.WinDelayLabel.Text = string.format("Win Delay: %.1fs", GetWinDelay())
-    
-    if State.running then
-        Monitor.RunStatus.Text = "▶ RUNNING"
-        Monitor.RunStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
-        local progress = (State.lastLoopTime > 0) and ((os.time() - State.lastLoopTime) / State.currentDelay) or 0
-        Monitor.ProgressBar.Size = UDim2.new(math.min(progress, 1), 0, 1, 0)
+--// Toggle auto detect
+AutoDetectButton.MouseButton1Click:Connect(function()
+    autoDetect = not autoDetect
+    if autoDetect then
+        AutoDetectButton.Text = "Auto: ON"
+        AutoDetectButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+        hookEnabled = true
+        InitializeRemoteHook()
     else
-        Monitor.RunStatus.Text = "⏸️ STOPPED"
-        Monitor.RunStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-        Monitor.ProgressBar.Size = UDim2.new(0, 0, 1, 0)
+        AutoDetectButton.Text = "Auto: OFF"
+        AutoDetectButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+        UnhookRemote()
     end
-    
-    if State.isReady then
-        Controls.MainButton.BackgroundColor3 = State.running and Color3.fromRGB(0, 200, 50) or Color3.fromRGB(0, 150, 50)
+end)
+
+AutoDetectButton.MouseEnter:Connect(function()
+    if autoDetect then
+        AutoDetectButton.BackgroundColor3 = Color3.fromRGB(60, 220, 60)
     else
-        Controls.MainButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+        AutoDetectButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+    end
+end)
+
+AutoDetectButton.MouseLeave:Connect(function()
+    if autoDetect then
+        AutoDetectButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+    else
+        AutoDetectButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    end
+end)
+
+-- Detect Now
+DetectNowButton.MouseButton1Click:Connect(function()
+    StatusLabel.Text = "⏳ Mencoba mendeteksi ID..."
+    StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
+
+    local tempEvent = GetDrawHeroEvent()
+    if tempEvent then
+        pcall(function()
+            tempEvent:InvokeServer(1, drawCount)
+            task.wait(0.3)
+            tempEvent:InvokeServer(2, drawCount)
+            task.wait(0.3)
+        end)
+    end
+
+    if heroId == 7000117 then
+        StatusLabel.Text = "❌ Tidak ada ID terdeteksi. Coba jalankan game."
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+    end
+end)
+
+DetectNowButton.MouseEnter:Connect(function()
+    DetectNowButton.BackgroundColor3 = Color3.fromRGB(60, 120, 220)
+end)
+
+DetectNowButton.MouseLeave:Connect(function()
+    DetectNowButton.BackgroundColor3 = Color3.fromRGB(40, 80, 180)
+end)
+
+--// Function to run the loop
+local function DrawHeroFunction()
+    DrawHeroEvent = GetDrawHeroEvent()
+    if not DrawHeroEvent then
+        UpdateStatus("❌ Event tidak ditemukan!", Color3.fromRGB(255, 0, 0))
+        return
+    end
+
+    -- Gunakan customAmount jika tidak 0 (negatif), selain itu gunakan drawCount
+    local amountToDraw = drawCount
+    if customAmount ~= 0 then
+        amountToDraw = customAmount
+    end
+
+    local success, result = pcall(function()
+        return DrawHeroEvent:InvokeServer(heroId, amountToDraw)
+    end)
+
+    if not success then
+        UpdateStatus("❌ Error: " .. tostring(result), Color3.fromRGB(255, 0, 0))
+    else
+        if customAmount ~= 0 then
+            UpdateStatus("✅ Draw " .. FormatNumber(customAmount) .. " hero berhasil!", Color3.fromRGB(255, 100, 100))
+        end
     end
 end
 
------- FUNGSI EVENT HANDLER ------
-function SetupEventHandlers()
-    -- Start/Stop Button
-    Controls.MainButton.MouseButton1Click:Connect(function()
-        if State.isReady then
-            State.running = not State.running
-            Controls.MainButton.Text = State.running and "⏹ STOP" or "▶ START"
-            if State.running then
-                State.lastWinTime = os.time()
-                coroutine.wrap(RunLoop)()
-            end
-            UpdateMonitor()
-        end
-    end)
-
-    -- Auto Win Toggle
-    Controls.WinButton.MouseButton1Click:Connect(function()
-        if State.winID then
-            State.autoWinEnabled = not State.autoWinEnabled
-            Controls.WinButton.Text = State.autoWinEnabled and "🏆 WIN ON" or "🏆 WIN OFF"
-            Controls.WinButton.BackgroundColor3 = State.autoWinEnabled and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(60, 60, 70)
-            if State.autoWinEnabled then
-                State.lastWinTime = os.time()
-            end
-            UpdateMonitor()
-        end
-    end)
-
-    -- Auto Token Toggle
-    Controls.TokenButton.MouseButton1Click:Connect(function()
-        if State.magicTokenID then
-            State.autoTokenEnabled = not State.autoTokenEnabled
-            Controls.TokenButton.Text = State.autoTokenEnabled and "🔮 TOKEN ON" or "🔮 TOKEN OFF"
-            Controls.TokenButton.BackgroundColor3 = State.autoTokenEnabled and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(60, 60, 70)
-            if State.autoTokenEnabled and State.climbSpeed > 0 and not State.lockDelay then
-                State.currentDelay = GetAutoTokenDelay(State.climbSpeed)
-                Controls.DelayBox.Text = string.format("%.1f", State.currentDelay)
-                UpdateMonitor()
-            end
-        end
-    end)
-
-    -- Lock Delay Toggle
-    Controls.LockButton.MouseButton1Click:Connect(function()
-        State.lockDelay = not State.lockDelay
-        Controls.LockButton.Text = State.lockDelay and "🔒 DELAY LOCKED" or "🔒 DELAY UNLOCKED"
-        Controls.LockButton.BackgroundColor3 = State.lockDelay and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(60, 60, 70)
-        Controls.DelayBox.TextEditable = not State.lockDelay
-        Controls.DelayBox.BackgroundColor3 = State.lockDelay and Color3.fromRGB(60, 60, 70) or Color3.fromRGB(40, 40, 45)
-        UpdateMonitor()
-    end)
-
-    -- Delay Box Change
-    Controls.DelayBox:GetPropertyChangedSignal("Text"):Connect(function()
-        if not State.lockDelay then
-            local newDelay = tonumber(Controls.DelayBox.Text) or DEFAULT_DELAY
-            State.currentDelay = newDelay
-            if State.climbSpeed > 0 then
-                State.currentHeight = CalculateHeight(State.climbSpeed, newDelay)
-                Controls.HeightBox.Text = tostring(State.currentHeight)
-            end
-            UpdateMonitor()
-        end
-    end)
-
-    -- Height Box Change
-    Controls.HeightBox:GetPropertyChangedSignal("Text"):Connect(function()
-        local newHeight = tonumber(Controls.HeightBox.Text) or DEFAULT_HEIGHT
-        State.currentHeight = math.min(newHeight, MAX_HEIGHT)
-        UpdateMonitor()
-    end)
-
-    -- Reset Speed Button
-    Controls.SpeedButton.MouseButton1Click:Connect(function()
-        State.climbSpeed = 0
-        State.climbing = false
-        UpdateMonitor()
-    end)
-
-    -- Close Button
-    Controls.CloseButton.MouseButton1Click:Connect(function()
-        State.hookEnabled = false
-        Controls.ControlGui:Destroy()
-        if Monitor and Monitor.MonitorGui then
-            Monitor.MonitorGui:Destroy()
-        end
-    end)
-
-    -- Keyboard Shortcut: Space to Start/Stop
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode.Space then
-            Controls.MainButton:Click()
-        end
-    end)
-end
-
------- FUNGSI INISIALISASI ------
-function InitializeAll()
-    -- Buat GUI
-    Monitor = CreateMonitor()
-    Controls = CreateControls()
-    
-    -- Setup event handlers
-    SetupEventHandlers()
-    
-    -- Initialize remote hook
-    InitializeRemoteHook()
-    
-    -- Setup character detection
-    local LocalPlayer = Players.LocalPlayer
-    if LocalPlayer.Character then
-        TrackClimbingState(LocalPlayer.Character)
+local function RunLoop()
+    while running do
+        DrawHeroFunction()
+        wait(delayTime)
     end
-    LocalPlayer.CharacterAdded:Connect(TrackClimbingState)
-    
-    -- Update monitor pertama
-    UpdateMonitor()
-    
-    print("Auto Coin V3 - Separate Controls & Monitor Loaded!")
-    print("Shortcut: Space to Start/Stop")
 end
 
--- Jalankan
-InitializeAll()
+--// Start/Stop button
+StartStopButton.MouseButton1Click:Connect(function()
+    running = not running
+    if running then
+        StartStopButton.Text = "Stop"
+        StartStopButton.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+        coroutineLoop = coroutine.wrap(RunLoop)
+        coroutineLoop()
+        
+        local amountDisplay = drawCount .. "x"
+        if customAmount ~= 0 then
+            amountDisplay = FormatNumber(customAmount)
+        end
+        UpdateStatus("▶️ Running... ID: " .. heroId .. " | " .. amountDisplay, Color3.fromRGB(0, 255, 0))
+    else
+        StartStopButton.Text = "Start"
+        StartStopButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        UpdateStatus("⏹️ Stopped", Color3.fromRGB(255, 255, 0))
+    end
+end)
+
+--// Minimize function
+local function MinimizeGUI()
+    isMinimized = true
+    TweenService:Create(Frame, TweenInfo.new(0.3), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(1, 0, 1, 0)
+    }):Play()
+    task.wait(0.3)
+    Frame.Visible = false
+    MiniButton.Visible = true
+end
+
+local function RestoreGUI()
+    isMinimized = false
+    MiniButton.Visible = false
+    Frame.Visible = true
+    TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 380, 0, 200),
+        Position = UDim2.new(0.5, -190, 0.5, -100)
+    }):Play()
+end
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    MinimizeGUI()
+end)
+
+MiniButton.MouseButton1Click:Connect(function()
+    RestoreGUI()
+end)
+
+MiniButton.MouseEnter:Connect(function()
+    MiniButton.BackgroundColor3 = Color3.fromRGB(60, 220, 60)
+end)
+
+MiniButton.MouseLeave:Connect(function()
+    MiniButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+end)
+
+--// CLOSE BUTTON
+CloseButton.MouseButton1Click:Connect(function()
+    hookEnabled = false
+    running = false
+    coroutineLoop = nil
+    MainFrame:Destroy()
+end)
+
+-- Close button hover
+CloseButton.MouseEnter:Connect(function()
+    CloseButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+end)
+
+CloseButton.MouseLeave:Connect(function()
+    CloseButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+end)
+
+MinimizeButton.MouseEnter:Connect(function()
+    MinimizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+end)
+
+MinimizeButton.MouseLeave:Connect(function()
+    MinimizeButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+end)
+
+StartStopButton.MouseEnter:Connect(function()
+    if running then
+        StartStopButton.BackgroundColor3 = Color3.fromRGB(140, 50, 50)
+    else
+        StartStopButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end
+end)
+
+StartStopButton.MouseLeave:Connect(function()
+    if running then
+        StartStopButton.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+    else
+        StartStopButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    end
+end)
+
+-- ID Box input
+IdBox.FocusLost:Connect(function(enterPressed)
+    local newId = tonumber(IdBox.Text)
+    if newId and newId > 0 then
+        heroId = newId
+        UpdateStatus("ID manual: " .. heroId, Color3.fromRGB(0, 255, 0))
+        IdDetectedLabel.Text = "📌 ID Manual: " .. heroId
+        IdDetectedLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    else
+        IdBox.Text = tostring(heroId)
+    end
+end)
+
+-- Delay Box input
+DelayBox.FocusLost:Connect(function(enterPressed)
+    local newDelay = tonumber(DelayBox.Text)
+    if newDelay and newDelay > 0 then
+        delayTime = newDelay
+        UpdateStatus("Delay: " .. delayTime .. "s", Color3.fromRGB(0, 255, 0))
+    else
+        DelayBox.Text = tostring(delayTime)
+    end
+end)
+
+--// Initialize
+UpdateDrawButtons(10)
+local initSuccess = InitializeRemoteHook()
+if initSuccess then
+    UpdateStatus("✅ Script siap. Auto detect aktif.", Color3.fromRGB(0, 255, 0))
+else
+    UpdateStatus("⚠️ Auto detect gagal. Gunakan ID manual.", Color3.fromRGB(255, 165, 0))
+end
+
+print("🚀 Auto Hatch Script Loaded")
+print("📌 Default ID: " .. heroId)
+print("📌 Default Draw: " .. drawCount .. "x")
