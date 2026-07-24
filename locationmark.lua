@@ -1,7 +1,6 @@
 --[[ 
-GUI Bookmark Lokasi + Import + Waypoint (Roblox Lua)
+GUI Location Mark + Import + Waypoint (Roblox Lua)
 Dengan penyimpanan di folder Delta
-Mengikuti struktur dari referensi bookmark.lua
 ]]
 
 -- ==== Helper: Dapatkan Player & Services ====
@@ -11,12 +10,11 @@ local playerGui = player:WaitForChild("PlayerGui")
 local HttpService = game:GetService("HttpService")
 
 -- ==== KONFIGURASI PENYIMPANAN DELTA ====
--- Gunakan path sederhana di root Delta
 local STORAGE_FOLDER = "locationmark/"
-local STORAGE_PATH = STORAGE_FOLDER .. "bookmarks.json"
+local STORAGE_PATH = STORAGE_FOLDER .. "locations.json"
 
 -- ==== Data ====
-local bookmarks = {}
+local locations = {}  -- { [name] = Vector3, ... }
 local savedLocations = {}
 
 -- ==== Fungsi Penyimpanan Delta ====
@@ -40,13 +38,13 @@ local function ensureFolder()
 end
 
 local function saveData()
-    if not next(bookmarks) then
+    if not next(locations) then
         print("⚠️ Tidak ada data untuk disimpan")
         return false
     end
 
     local dataToSave = {}
-    for name, pos in pairs(bookmarks) do
+    for name, pos in pairs(locations) do
         dataToSave[name] = {X = pos.X, Y = pos.Y, Z = pos.Z}
     end
 
@@ -76,7 +74,7 @@ local function saveData()
 
     -- Fallback ke atribut player
     success, err = pcall(function()
-        player:SetAttribute("BookmarkData", json)
+        player:SetAttribute("LocationData", json)
     end)
 
     if success then
@@ -112,12 +110,12 @@ local function loadData()
                     local count = 0
                     for name, posData in pairs(decoded) do
                         if type(posData) == "table" and posData.X and posData.Y and posData.Z then
-                            bookmarks[name] = Vector3.new(posData.X, posData.Y, posData.Z)
+                            locations[name] = Vector3.new(posData.X, posData.Y, posData.Z)
                             count = count + 1
                         end
                     end
                     if count > 0 then
-                        print(string.format("✅ Berhasil memuat %d bookmark", count))
+                        print(string.format("✅ Berhasil memuat %d location mark", count))
                         dataLoaded = true
                     end
                 end
@@ -126,7 +124,7 @@ local function loadData()
     end
 
     if not dataLoaded then
-        local attrData = player:GetAttribute("BookmarkData")
+        local attrData = player:GetAttribute("LocationData")
         if attrData and attrData ~= "" then
             local decoded
             local success, err = pcall(function()
@@ -137,12 +135,12 @@ local function loadData()
                 local count = 0
                 for name, posData in pairs(decoded) do
                     if type(posData) == "table" and posData.X and posData.Y and posData.Z then
-                        bookmarks[name] = Vector3.new(posData.X, posData.Y, posData.Z)
+                        locations[name] = Vector3.new(posData.X, posData.Y, posData.Z)
                         count = count + 1
                     end
                 end
                 if count > 0 then
-                    print(string.format("✅ Berhasil memuat %d bookmark dari atribut", count))
+                    print(string.format("✅ Berhasil memuat %d location mark dari atribut", count))
                     dataLoaded = true
                 end
             end
@@ -151,8 +149,8 @@ local function loadData()
 
     if not dataLoaded then
         print("ℹ️ Tidak ada data ditemukan. Membuat data contoh.")
-        bookmarks["Rumah"] = Vector3.new(0, 10, 0)
-        bookmarks["Toko"] = Vector3.new(100, 5, 200)
+        locations["Rumah"] = Vector3.new(0, 10, 0)
+        locations["Toko"] = Vector3.new(100, 5, 200)
         saveData()
     end
 
@@ -163,11 +161,11 @@ end
 loadData()
 
 -- ============================================
--- UI CREATION - MENGIKUTI REFERENSI
+-- UI CREATION
 -- ============================================
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "BookmarkLokasiGUI"
+screenGui.Name = "LocationMarkGUI"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = playerGui
@@ -206,7 +204,7 @@ title.Name = "Title"
 title.Size = UDim2.new(1, -50, 1, 0)
 title.Position = UDim2.fromOffset(0, 0)
 title.BackgroundTransparency = 1
-title.Text = "📍 Bookmark Lokasi"
+title.Text = "📍 Location Mark"
 title.TextColor3 = Color3.fromRGB(235, 235, 235)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 12
@@ -269,9 +267,9 @@ local function createTab(name, text, position, size)
 	tab.Name = "Tab" .. name
 	tab.Size = size
 	tab.Position = position
-	tab.BackgroundColor3 = name == "Bookmark" and Color3.fromRGB(60, 120, 255) or Color3.fromRGB(40, 40, 40)
+	tab.BackgroundColor3 = name == "Location" and Color3.fromRGB(60, 120, 255) or Color3.fromRGB(40, 40, 40)
 	tab.Text = text
-	tab.TextColor3 = name == "Bookmark" and Color3.new(1, 1, 1) or Color3.fromRGB(180, 180, 180)
+	tab.TextColor3 = name == "Location" and Color3.new(1, 1, 1) or Color3.fromRGB(180, 180, 180)
 	tab.Font = Enum.Font.GothamBold
 	tab.TextSize = 10
 	tab.AutoButtonColor = false
@@ -280,7 +278,7 @@ local function createTab(name, text, position, size)
 	return tab
 end
 
-local tabBookmark = createTab("Bookmark", "Bookmark", UDim2.fromOffset(0, 0), UDim2.new(0.333, -2, 1, 0))
+local tabLocation = createTab("Location", "Location", UDim2.fromOffset(0, 0), UDim2.new(0.333, -2, 1, 0))
 local tabImport = createTab("Import", "Import", UDim2.new(0.333, 2, 0, 0), UDim2.new(0.333, -2, 1, 0))
 local tabSaver = createTab("Saver", "Saver", UDim2.new(0.666, 2, 0, 0), UDim2.new(0.333, 0, 1, 0))
 
@@ -293,24 +291,24 @@ tabContent.BackgroundTransparency = 1
 tabContent.ClipsDescendants = true
 tabContent.Parent = mainFrame
 
--- ===== TAB BOOKMARK =====
-local bookmarkTab = Instance.new("ScrollingFrame")
-bookmarkTab.Name = "BookmarkTab"
-bookmarkTab.Size = UDim2.new(1, 0, 1, 0)
-bookmarkTab.Position = UDim2.fromOffset(0, 0)
-bookmarkTab.CanvasSize = UDim2.new(0, 0, 0, 0)
-bookmarkTab.ScrollBarThickness = 4
-bookmarkTab.BackgroundTransparency = 1
-bookmarkTab.BorderSizePixel = 0
-bookmarkTab.Visible = true
-bookmarkTab.Parent = tabContent
+-- ===== TAB LOCATION =====
+local locationTab = Instance.new("ScrollingFrame")
+locationTab.Name = "LocationTab"
+locationTab.Size = UDim2.new(1, 0, 1, 0)
+locationTab.Position = UDim2.fromOffset(0, 0)
+locationTab.CanvasSize = UDim2.new(0, 0, 0, 0)
+locationTab.ScrollBarThickness = 4
+locationTab.BackgroundTransparency = 1
+locationTab.BorderSizePixel = 0
+locationTab.Visible = true
+locationTab.Parent = tabContent
 
-local uiList = Instance.new("UIListLayout", bookmarkTab)
+local uiList = Instance.new("UIListLayout", locationTab)
 uiList.Padding = UDim.new(0, 5)
 uiList.HorizontalAlignment = Enum.HorizontalAlignment.Left
 uiList.SortOrder = Enum.SortOrder.LayoutOrder
 
-local listPadding = Instance.new("UIPadding", bookmarkTab)
+local listPadding = Instance.new("UIPadding", locationTab)
 listPadding.PaddingTop = UDim.new(0, 5)
 listPadding.PaddingLeft = UDim.new(0, 5)
 listPadding.PaddingRight = UDim.new(0, 5)
@@ -319,7 +317,7 @@ listPadding.PaddingBottom = UDim.new(0, 5)
 local function updateCanvasSize()
 	task.defer(function()
 		local contentSize = uiList.AbsoluteContentSize
-		bookmarkTab.CanvasSize = UDim2.new(0, 0, 0, contentSize.Y + 10)
+		locationTab.CanvasSize = UDim2.new(0, 0, 0, contentSize.Y + 10)
 	end)
 end
 uiList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvasSize)
@@ -460,21 +458,21 @@ closeBtn.MouseButton1Click:Connect(function()
 end)
 
 local function switchTab(selectedTab)
-	tabBookmark.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	tabBookmark.TextColor3 = Color3.fromRGB(180, 180, 180)
+	tabLocation.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	tabLocation.TextColor3 = Color3.fromRGB(180, 180, 180)
 	tabImport.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 	tabImport.TextColor3 = Color3.fromRGB(180, 180, 180)
 	tabSaver.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 	tabSaver.TextColor3 = Color3.fromRGB(180, 180, 180)
 
-	bookmarkTab.Visible = false
+	locationTab.Visible = false
 	importTab.Visible = false
 	saverTab.Visible = false
 
-	if selectedTab == "bookmark" then
-		tabBookmark.BackgroundColor3 = Color3.fromRGB(60, 120, 255)
-		tabBookmark.TextColor3 = Color3.new(1, 1, 1)
-		bookmarkTab.Visible = true
+	if selectedTab == "location" then
+		tabLocation.BackgroundColor3 = Color3.fromRGB(60, 120, 255)
+		tabLocation.TextColor3 = Color3.new(1, 1, 1)
+		locationTab.Visible = true
 	elseif selectedTab == "import" then
 		tabImport.BackgroundColor3 = Color3.fromRGB(60, 120, 255)
 		tabImport.TextColor3 = Color3.new(1, 1, 1)
@@ -486,23 +484,24 @@ local function switchTab(selectedTab)
 	end
 end
 
-tabBookmark.MouseButton1Click:Connect(function() switchTab("bookmark") end)
+tabLocation.MouseButton1Click:Connect(function() switchTab("location") end)
 tabImport.MouseButton1Click:Connect(function() switchTab("import") end)
 tabSaver.MouseButton1Click:Connect(function() switchTab("saver") end)
 
--- ==== Buat item bookmark ====
+-- ==== Buat item location mark DENGAN TOMBOL RENAME ====
 local function makeListItem(name, v3)
 	local item = Instance.new("Frame")
 	item.Name = "Item_" .. name
 	item.Size = UDim2.new(1, -10, 0, 32)
 	item.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 	item.BorderSizePixel = 0
-	item.Parent = bookmarkTab
+	item.Parent = locationTab
 	Instance.new("UICorner", item).CornerRadius = UDim.new(0, 5)
 
+	-- Label nama
 	local nameLbl = Instance.new("TextLabel")
 	nameLbl.Name = "NameLabel"
-	nameLbl.Size = UDim2.new(1, -60, 1, -0)
+	nameLbl.Size = UDim2.new(1, -115, 1, -0)  -- Dikurangi untuk tombol rename
 	nameLbl.Position = UDim2.fromOffset(8, 0)
 	nameLbl.BackgroundTransparency = 1
 	nameLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -512,12 +511,27 @@ local function makeListItem(name, v3)
 	nameLbl.TextSize = 11
 	nameLbl.Parent = item
 
+	-- Tombol Rename
+	local renameBtn = Instance.new("TextButton")
+	renameBtn.Name = "RenameBtn"
+	renameBtn.Size = UDim2.fromOffset(28, 24)
+	renameBtn.Position = UDim2.new(1, -108, 0.5, -12)
+	renameBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 50)
+	renameBtn.Text = "✎"
+	renameBtn.TextColor3 = Color3.new(1,1,1)
+	renameBtn.Font = Enum.Font.GothamBold
+	renameBtn.TextSize = 12
+	renameBtn.AutoButtonColor = true
+	renameBtn.Parent = item
+	Instance.new("UICorner", renameBtn).CornerRadius = UDim.new(0, 5)
+
+	-- Tombol Teleport
 	local tpBtn = Instance.new("TextButton")
 	tpBtn.Name = "TpBtn"
-	tpBtn.Size = UDim2.fromOffset(60, 24)
-	tpBtn.Position = UDim2.new(1, -75, 0.5, -12)
+	tpBtn.Size = UDim2.fromOffset(45, 24)
+	tpBtn.Position = UDim2.new(1, -78, 0.5, -12)
 	tpBtn.BackgroundColor3 = Color3.fromRGB(80, 160, 90)
-	tpBtn.Text = "Teleport"
+	tpBtn.Text = "TP"
 	tpBtn.TextColor3 = Color3.new(1,1,1)
 	tpBtn.Font = Enum.Font.GothamBold
 	tpBtn.TextSize = 10
@@ -525,6 +539,7 @@ local function makeListItem(name, v3)
 	tpBtn.Parent = item
 	Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 5)
 
+	-- Tombol Hapus
 	local delBtn = Instance.new("TextButton")
 	delBtn.Name = "DelBtn"
 	delBtn.Size = UDim2.fromOffset(24, 24)
@@ -538,6 +553,121 @@ local function makeListItem(name, v3)
 	delBtn.Parent = item
 	Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 5)
 
+	-- ===== FUNGSI RENAME =====
+	renameBtn.MouseButton1Click:Connect(function()
+		-- Buat popup input untuk rename
+		local popup = Instance.new("Frame")
+		popup.Name = "RenamePopup"
+		popup.Size = UDim2.fromOffset(200, 80)
+		popup.Position = UDim2.new(0.5, -100, 0.5, -40)
+		popup.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+		popup.BackgroundTransparency = 0.1
+		popup.BorderSizePixel = 0
+		popup.Parent = screenGui
+		Instance.new("UICorner", popup).CornerRadius = UDim.new(0, 8)
+
+		-- Efek blur background
+		local blur = Instance.new("BlurEffect", game:GetService("Lighting"))
+		blur.Size = 8
+
+		-- Label
+		local popupLabel = Instance.new("TextLabel")
+		popupLabel.Size = UDim2.new(1, -20, 0, 20)
+		popupLabel.Position = UDim2.new(0, 10, 0, 5)
+		popupLabel.BackgroundTransparency = 1
+		popupLabel.Text = "Masukkan nama baru:"
+		popupLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+		popupLabel.Font = Enum.Font.Gotham
+		popupLabel.TextSize = 11
+		popupLabel.TextXAlignment = Enum.TextXAlignment.Left
+		popupLabel.Parent = popup
+
+		-- Input Box
+		local renameInput = Instance.new("TextBox")
+		renameInput.Size = UDim2.new(1, -20, 0, 25)
+		renameInput.Position = UDim2.new(0, 10, 0, 30)
+		renameInput.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+		renameInput.Text = name
+		renameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+		renameInput.Font = Enum.Font.Gotham
+		renameInput.TextSize = 11
+		renameInput.Parent = popup
+		Instance.new("UICorner", renameInput).CornerRadius = UDim.new(0, 4)
+
+		-- Tombol Rename
+		local confirmBtn = Instance.new("TextButton")
+		confirmBtn.Size = UDim2.fromOffset(60, 25)
+		confirmBtn.Position = UDim2.new(1, -70, 1, -30)
+		confirmBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
+		confirmBtn.Text = "Rename"
+		confirmBtn.TextColor3 = Color3.new(1,1,1)
+		confirmBtn.Font = Enum.Font.GothamBold
+		confirmBtn.TextSize = 10
+		confirmBtn.AutoButtonColor = true
+		confirmBtn.Parent = popup
+		Instance.new("UICorner", confirmBtn).CornerRadius = UDim.new(0, 4)
+
+		-- Tombol Batal
+		local cancelBtn = Instance.new("TextButton")
+		cancelBtn.Size = UDim2.fromOffset(50, 25)
+		cancelBtn.Position = UDim2.new(1, -125, 1, -30)
+		cancelBtn.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+		cancelBtn.Text = "Batal"
+		cancelBtn.TextColor3 = Color3.new(1,1,1)
+		cancelBtn.Font = Enum.Font.GothamBold
+		cancelBtn.TextSize = 10
+		cancelBtn.AutoButtonColor = true
+		cancelBtn.Parent = popup
+		Instance.new("UICorner", cancelBtn).CornerRadius = UDim.new(0, 4)
+
+		-- Fungsi rename
+		local function doRename()
+			local newName = renameInput.Text
+			if newName == "" then
+				setStatus("❌ Nama tidak boleh kosong!", true)
+				return
+			end
+
+			if locations[newName] then
+				setStatus("❌ Nama '" .. newName .. "' sudah digunakan!", true)
+				return
+			end
+
+			-- Pindahkan data ke nama baru
+			locations[newName] = locations[name]
+			locations[name] = nil
+
+			-- Update UI
+			nameLbl.Text = newName
+			item.Name = "Item_" .. newName
+			
+			-- Update nama di tabel data
+			saveData()
+			setStatus("✅ Berhasil rename '" .. name .. "' → '" .. newName .. "'", false)
+			
+			-- Tutup popup
+			popup:Destroy()
+			blur:Destroy()
+		end
+
+		confirmBtn.MouseButton1Click:Connect(doRename)
+		cancelBtn.MouseButton1Click:Connect(function()
+			popup:Destroy()
+			blur:Destroy()
+		end)
+		
+		-- Enter key untuk rename
+		renameInput.FocusLost:Connect(function(enterPressed)
+			if enterPressed then
+				doRename()
+			end
+		end)
+
+		-- Fokus ke input
+		renameInput:CaptureFocus()
+	end)
+
+	-- ===== TELEPORT =====
 	tpBtn.MouseButton1Click:Connect(function()
 		local char = player.Character or player.CharacterAdded:Wait()
 		local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -549,32 +679,33 @@ local function makeListItem(name, v3)
 		end
 	end)
 
+	-- ===== DELETE =====
 	delBtn.MouseButton1Click:Connect(function()
-		bookmarks[name] = nil
+		locations[name] = nil
 		item:Destroy()
 		updateCanvasSize()
 		saveData()
-		setStatus("Hapus bookmark: " .. name, false)
+		setStatus("Hapus location mark: " .. name, false)
 	end)
 
 	return item
 end
 
 local function renderList()
-	for _, child in ipairs(bookmarkTab:GetChildren()) do
+	for _, child in ipairs(locationTab:GetChildren()) do
 		if child:IsA("Frame") and child.Name:match("^Item_") then
 			child:Destroy()
 		end
 	end
 	
 	local names = {}
-	for name in pairs(bookmarks) do
+	for name in pairs(locations) do
 		table.insert(names, name)
 	end
 	table.sort(names, function(a, b) return a:lower() < b:lower() end)
 
 	for _, name in ipairs(names) do
-		makeListItem(name, bookmarks[name])
+		makeListItem(name, locations[name])
 	end
 
 	updateCanvasSize()
@@ -592,7 +723,7 @@ local function parseAndImport(text)
 		local vy = tonumber(y)
 		local vz = tonumber(z)
 		if name ~= "" and vx and vy and vz then
-			bookmarks[name] = Vector3.new(vx, vy, vz)
+			locations[name] = Vector3.new(vx, vy, vz)
 			count = count + 1
 		end
 	end
@@ -603,8 +734,8 @@ local function parseAndImport(text)
 
 	renderList()
 	saveData()
-	switchTab("bookmark")
-	return true, ("Berhasil import %d bookmark."):format(count)
+	switchTab("location")
+	return true, ("Berhasil import %d location mark."):format(count)
 end
 
 importBtn.MouseButton1Click:Connect(function()
@@ -615,7 +746,7 @@ end)
 -- ==== Generate nama otomatis ====
 local function generateAutoName()
 	local maxNum = 0
-	for name in pairs(bookmarks) do
+	for name in pairs(locations) do
 		local num = name:match("Lokasi (%d+)")
 		if num then
 			num = tonumber(num)
@@ -644,7 +775,7 @@ saveButton.MouseButton1Click:Connect(function()
 		saverStatusLabel.Text = "✅ Lokasi '"..name.."' tersimpan."
 	end
 
-	bookmarks[name] = pos
+	locations[name] = pos
 	savedLocations[name] = pos
 
 	makeListItem(name, pos)
@@ -652,18 +783,18 @@ saveButton.MouseButton1Click:Connect(function()
 	saveData()
 
 	saverTextBox.Text = ""
-	switchTab("bookmark")
+	switchTab("location")
 end)
 
 -- ==== Print & Copy ====
 printButton.MouseButton1Click:Connect(function()
-	if next(bookmarks) == nil then
-		saverStatusLabel.Text = "⚠️ Tidak ada bookmark."
+	if next(locations) == nil then
+		saverStatusLabel.Text = "⚠️ Tidak ada location mark."
 		return
 	end
 
-	local result = "local Bookmarks = {\n"
-	for name, pos in pairs(bookmarks) do
+	local result = "local Locations = {\n"
+	for name, pos in pairs(locations) do
 		result = result .. string.format('    ["%s"] = Vector3.new(%.2f, %.2f, %.2f),\n', name, pos.X, pos.Y, pos.Z)
 	end
 	result = result .. "}"
@@ -672,7 +803,7 @@ printButton.MouseButton1Click:Connect(function()
 
 	if setclipboard then
 		setclipboard(result)
-		saverStatusLabel.Text = "✅ Bookmark dicopy ke clipboard."
+		saverStatusLabel.Text = "✅ Location mark dicopy ke clipboard."
 	else
 		saverStatusLabel.Text = "❌ setclipboard tidak tersedia."
 	end
@@ -688,6 +819,6 @@ importBox.Text = contoh
 
 -- ==== Render awal ====
 renderList()
-switchTab("bookmark")
-print("✅ Bookmark GUI telah dimuat!")
+switchTab("location")
+print("✅ Location Mark GUI telah dimuat!")
 print("📁 Lokasi penyimpanan: " .. STORAGE_PATH)
