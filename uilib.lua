@@ -174,16 +174,17 @@ function CAJTUI:CreateWindow(config)
     navBar.Parent = frame
 
     -- Tab Container (Scrolling untuk banyak tab)
-    local tabContainer = Instance.new("ScrollingFrame")
-    tabContainer.Size = UDim2.new(1, -10, 1, 0)
-    tabContainer.Position = UDim2.new(0, 5, 0, 0)
-    tabContainer.BackgroundTransparency = 1
-    tabContainer.BorderSizePixel = 0
-    tabContainer.ScrollBarThickness = 3
-    tabContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-    tabContainer.AutomaticCanvasSize = Enum.AutomaticSize.X
-    tabContainer.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Left
-    tabContainer.Parent = navBar
+local tabContainer = Instance.new("ScrollingFrame")
+tabContainer.Size = UDim2.new(1, -10, 1, 0)
+tabContainer.Position = UDim2.new(0, 5, 0, 0)
+tabContainer.BackgroundTransparency = 1
+tabContainer.BorderSizePixel = 0
+tabContainer.ScrollBarThickness = 3
+tabContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+tabContainer.AutomaticCanvasSize = Enum.AutomaticSize.X
+tabContainer.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Left
+tabContainer.ScrollingDirection = Enum.ScrollingDirection.X  -- ✅ TAMBAHKAN INI
+tabContainer.Parent = navBar
 
     -- Content Container
     local contentContainer = Instance.new("Frame")
