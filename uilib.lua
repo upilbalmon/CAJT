@@ -301,11 +301,9 @@ function CAJTUI:CreateTab(config)
     table.insert(data.Tabs, tabData)
     table.insert(window._tabs, tabData)
 
-   -- If first tab, activate it
+  -- If first tab, activate it
 if #data.Tabs == 1 then
-    -- Panggil fungsi aktivasi langsung
-    tabBtn.MouseButton1Click:Connect(function() end) -- Hanya untuk testing
-    -- Atau lebih baik, panggil logika aktivasi langsung
+    -- Aktivasi manual tab pertama
     for _, btn in pairs(data.TabContainer:GetChildren()) do
         if btn:IsA("TextButton") then
             btn.BackgroundTransparency = 0.5
@@ -324,7 +322,7 @@ if #data.Tabs == 1 then
     contentPanel.Visible = true
     data.ActiveTab = tabBtn
 end
-
+    
     -- Return tab object
     return setmetatable({
         _data = tabData,
