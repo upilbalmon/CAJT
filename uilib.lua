@@ -75,7 +75,7 @@ function CAJTUI:CreateWindow(config)
     CreateCorner(frame, 10)
     CreateStroke(frame, Theme.Border, 1)
 
-    -- Shadow (tanpa Size)
+    -- Shadow
     local shadow = Instance.new("UIShadow")
     shadow.Color = Color3.fromRGB(0, 0, 0)
     shadow.Parent = frame
@@ -177,6 +177,13 @@ function CAJTUI:CreateWindow(config)
     tabContainer.ScrollingDirection = Enum.ScrollingDirection.X
     tabContainer.Parent = navBar
 
+    -- UIListLayout untuk tab button (agar tidak bertumpuk)
+    local tabLayout = Instance.new("UIListLayout")
+    tabLayout.FillDirection = Enum.FillDirection.Horizontal
+    tabLayout.Padding = UDim.new(0, 4)
+    tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    tabLayout.Parent = tabContainer
+
     -- Content Container
     local contentContainer = Instance.new("Frame")
     contentContainer.Size = UDim2.new(1, 0, 1, -75)
@@ -218,9 +225,9 @@ function CAJTUI:CreateTab(config)
     local window = self
     local data = window._data
 
-    -- Create Tab Button (lebar 120px)
+    -- Create Tab Button
     local tabBtn = Instance.new("TextButton")
-    tabBtn.Size = UDim2.new(0, 120, 1, -6)
+    tabBtn.Size = UDim2.new(0, 110, 1, -6)
     tabBtn.Position = UDim2.new(0, 0, 0, 3)
     tabBtn.Text = config.Title or "Tab"
     tabBtn.TextColor3 = Theme.TextSecondary
@@ -332,7 +339,7 @@ function CAJTUI:CreateSection(config)
     local tab = self
     local panel = tab._panel
 
-    -- Section container (dengan default height 100)
+    -- Section container
     local section = Instance.new("Frame")
     section.Size = UDim2.new(1, 0, 0, config.Height or 100)
     section.BackgroundColor3 = Theme.Surface
