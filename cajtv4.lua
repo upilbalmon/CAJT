@@ -1,1036 +1,873 @@
 --[[
-    AUTO COIN V3 - Enhanced Version with Lock Speed & Fixed GUI
-    Features:
-    1. Auto height calculation: (speed × 2.8) × delay
-    2. Dynamic auto win delay: 10000 / speed
-    3. Compact 200x280 GUI
-    4. All original functionality preserved
-    5. Auto token delay formula: (10000/speed) with 1 decimal place
-    6. Max height limit: 14400
-    7. Lock speed setting checkbox
-    8. Sync Delay toggle button
-    9. CWT indicators with RED/GREEN lights (50% smaller, left of text)
-    10. Height, Delay, Speed in ONE ROW with labels below
-    11. Lock Delay checkbox REMOVED
+    AUTO COIN V4 - Compact Version with Real-time Cooldown Status
+    Fitur: Height (auto), Delay (manual), Speed | Lock Speed | Sync Delay | Mode Farming
+    Sync Delay: Menyamakan delay dan membuat loop berjalan bareng
 ]]
 
------- SERVICES ------
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Infinity = loadstring(game:HttpGet("https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/compactlibraryui.lua"))()
+
+local RS = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
------- CONSTANTS ------
-local PAUSE_INTERVAL = 60 * 60  -- 1 hour
-local PAUSE_DURATION = 30       -- 30 seconds
-local WIN_DELAY_BASE = 10000    -- Base for auto win delay calculation
-local DEFAULT_HEIGHT = 5000
-local DEFAULT_DELAY = 5
-local HEIGHT_MULTIPLIER = 2.8   -- Height calculation multiplier
-local MAX_HEIGHT = 14400        -- Maximum height limit
+-- CONSTANTS
+local PAUSE_INTERVAL, PAUSE_DURATION, WIN_DELAY_BASE = 3600, 30, 10000
+local DEFAULT_HEIGHT, DEFAULT_DELAY, HEIGHT_MULTIPLIER, MAX_HEIGHT = 5000, 5, 2.8, 14400
 
------- STATE MANAGEMENT ------
-local State = {
-    jumpID = nil,
-    landingID = nil,
-    winID = nil,
-    magicTokenID = nil,
-    isReady = false,
-    running = false,
-    autoWinEnabled = false,
-    autoTokenEnabled = false,
-    runTime = 0,
-    lastLoopTime = 0,
-    nextLoopTime = 0,
-    lastWinTime = 0,
-    hookEnabled = true,
-    minimized = false,
-    climbSpeed = 0,
-    climbing = false,
-    climbStartY = 0,
-    climbStartTime = 0,
-    maxY = 0,
-    lockSpeed = false,
-    lockedSpeed = 0,
-    syncEnabled = false,
-    -- Status tracking
-    lastCoinClaim = 0,
-    lastWinClaim = 0,
-    lastTokenClaim = 0
+-- STATE
+local S = {
+    jumpID = nil, landingID = nil, winID = nil, magicTokenID = nil,
+    isReady = false, running = false, hookEnabled = true,
+    runTime = 0, lastLoopTime = 0, nextLoopTime = 0, lastWinTime = 0,
+    climbSpeed = 0, climbing = false, climbStartY = 0, climbStartTime = 0, maxY = 0,
+    lockSpeed = false, lockedSpeed = 0, syncEnabled = false,
+    modeCoin = true, modeWin = true, modeToken = true,
+    manualDelay = DEFAULT_DELAY,
+    syncedDelay = DEFAULT_DELAY,
+    syncStartTime = 0, syncLoopCount = 0,
+    -- GUI refs
+    app = nil, gui = nil, heightBox = nil, delayBox = nil, speedBox = nil,
+    coinLight = nil, winLight = nil, tokenLight = nil,
+    coinCheck = nil, winCheck = nil, tokenCheck = nil,
+    coinCooldown = nil, winCooldown = nil, tokenCooldown = nil,
+    statusLabel = nil, lockSpeedCheckbox = nil, syncToggle = nil,
+    startStopButton = nil, clearLogButton = nil,
+    resultList = nil, scrollFrame = nil, progressBar = nil, progressText = nil,
+    resultCount = 0
 }
 
------- UTILITY FUNCTIONS ------
+-- GET CURRENT SPEED
+local function GetCurrentSpeed()
+    if S.lockSpeed and S.lockedSpeed > 0 then return S.lockedSpeed end
+    return S.climbSpeed
+end
+
+-- GET DELAY
+local function GetDelay()
+    if S.syncEnabled then return S.syncedDelay end
+    local delay = tonumber(S.delayBox and S.delayBox.Text)
+    if delay and delay > 0 then
+        S.manualDelay = delay
+        return delay
+    end
+    return S.manualDelay or DEFAULT_DELAY
+end
+
+local function GetCoinDelay() return GetDelay() end
+
 local function GetWinDelay()
-    local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
-    return currentSpeed > 0 and (WIN_DELAY_BASE / currentSpeed) or 20
+    if S.syncEnabled then return GetDelay() end
+    local speed = GetCurrentSpeed()
+    return speed > 0 and (WIN_DELAY_BASE / speed) or 20
+end
+
+local function GetTokenDelay()
+    if S.syncEnabled then return GetDelay() end
+    local speed = GetCurrentSpeed()
+    if speed > 0 then return math.floor((10000/speed)*10)/10 end
+    return GetDelay()
 end
 
 local function CalculateHeight()
-    local delay = tonumber(GUI.DelayBox.Text) or DEFAULT_DELAY
-    local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
-    local calculatedHeight = math.floor((currentSpeed * HEIGHT_MULTIPLIER) * delay)
-    return math.min(calculatedHeight, MAX_HEIGHT)
+    local delay = GetDelay()
+    local speed = GetCurrentSpeed()
+    return math.min(math.floor((speed * HEIGHT_MULTIPLIER) * delay), MAX_HEIGHT)
 end
 
 local function UpdateHeight()
-    local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
-    if currentSpeed > 0 then
-        GUI.HeightBox.Text = tostring(CalculateHeight())
+    local speed = GetCurrentSpeed()
+    if speed > 0 and S.heightBox then
+        S.heightBox.Text = tostring(CalculateHeight())
     end
 end
 
-local function SyncDelayWithWin()
-    local winDelay = GetWinDelay()
-    if winDelay > 0 then
-        GUI.DelayBox.Text = string.format("%.1f", winDelay)
+local function UpdateSpeedBox()
+    if not S.speedBox then return end
+    local speed = GetCurrentSpeed()
+    if S.lockSpeed and S.lockedSpeed > 0 then
+        S.speedBox.Text = string.format("%.2f [LOCKED]", S.lockedSpeed)
+        S.speedBox.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        S.speedBox.Text = string.format("%.2f", S.climbSpeed)
+        S.speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
+end
+
+local function UpdateDelayBox()
+    if not S.delayBox then return end
+    local delay = GetDelay()
+    S.delayBox.Text = string.format("%.1f", delay)
+    S.delayBox.TextColor3 = S.syncEnabled and Color3.fromRGB(100,255,100) or Color3.fromRGB(255,255,255)
+end
+
+local function GetModeDesc()
+    local parts = {}
+    if S.modeCoin then table.insert(parts, "🪙") end
+    if S.modeWin then table.insert(parts, "🏆") end
+    if S.modeToken then table.insert(parts, "✨") end
+    local modeStr = #parts > 0 and table.concat(parts, " ") or "❌ None"
+    return S.syncEnabled and modeStr .. " [SYNC]" or modeStr
+end
+
+-- SYNC DELAY
+local function SyncDelay()
+    local speed = GetCurrentSpeed()
+    if speed > 0 then
+        local newDelay = math.floor((WIN_DELAY_BASE / speed) * 10) / 10
+        if newDelay < 0.5 then newDelay = 0.5 end
+        S.syncedDelay = newDelay
+        S.manualDelay = newDelay
+        S.lastLoopTime = os.time()
+        S.lastWinTime = os.time()
+        S.syncStartTime = os.time()
+        S.syncLoopCount = 0
+        UpdateDelayBox()
         UpdateHeight()
-        GUI.StatusMessage.Text = string.format("SYNCED: %.1fs", winDelay)
-        GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-        task.wait(1.5)
-        if State.running then
-            UpdateStatusMessage("ready", "ready", "ready")
-        else
-            UpdateStatus()
-        end
         return true
     end
     return false
 end
 
------- GUI CREATION ------
-local function CreateGUI()
-    local player = Players.LocalPlayer
-    local playerGui = player:WaitForChild("PlayerGui")
-
-    -- Clean up previous GUI
-    if playerGui:FindFirstChild("CoinClaimerGUI") then
-        playerGui:FindFirstChild("CoinClaimerGUI"):Destroy()
-    end
-
-    -- Main ScreenGui
-    local MainFrame = Instance.new("ScreenGui")
-    MainFrame.Name = "CoinClaimerGUI"
-    MainFrame.Parent = playerGui
-    MainFrame.ResetOnSpawn = false
-    MainFrame.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-    -- Main Frame
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(0, 200, 0, 290)
-    Frame.Position = UDim2.new(0.5, -100, 0.5, -145)
-    Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    Frame.BackgroundTransparency = 0.1
-    Frame.BorderSizePixel = 0
-    Frame.Parent = MainFrame
-    Frame.Draggable = true
-    Frame.Active = true
-
-    -- Rounded Corners
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 8)
-    UICorner.Parent = Frame
-
-    -- Title Bar
-    local TitleBar = Instance.new("Frame")
-    TitleBar.Size = UDim2.new(1, 0, 0, 25)
-    TitleBar.Position = UDim2.new(0, 0, 0, 0)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    TitleBar.BorderSizePixel = 0
-    TitleBar.Parent = Frame
-
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 8, 0, 0)
-    TitleCorner.Parent = TitleBar
-
-    -- Title Text
-    local TitleText = Instance.new("TextLabel")
-    TitleText.Size = UDim2.new(0.7, 0, 1, 0)
-    TitleText.Position = UDim2.new(0.15, 0, 0, 0)
-    TitleText.Text = "AUTO"
-    TitleText.TextColor3 = Color3.new(1, 1, 1)
-    TitleText.BackgroundTransparency = 1
-    TitleText.Font = Enum.Font.GothamBold
-    TitleText.TextSize = 13
-    TitleText.Parent = TitleBar
-
-    -- Close Button
-    local CloseButton = Instance.new("TextButton")
-    CloseButton.Size = UDim2.new(0, 25, 0, 25)
-    CloseButton.Position = UDim2.new(1, -25, 0, 0)
-    CloseButton.Text = "×"
-    CloseButton.Font = Enum.Font.GothamBold
-    CloseButton.TextSize = 16
-    CloseButton.TextColor3 = Color3.new(1, 1, 1)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    CloseButton.Parent = TitleBar
-
-    local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 4)
-    CloseCorner.Parent = CloseButton
-
-    -- Minimize Button
-    local MinimizeButton = Instance.new("TextButton")
-    MinimizeButton.Size = UDim2.new(0, 25, 0, 25)
-    MinimizeButton.Position = UDim2.new(1, -50, 0, 0)
-    MinimizeButton.Text = "-"
-    MinimizeButton.Font = Enum.Font.GothamBold
-    MinimizeButton.TextSize = 16
-    MinimizeButton.TextColor3 = Color3.new(1, 1, 1)
-    MinimizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    MinimizeButton.Parent = TitleBar
-
-    local MinimizeCorner = Instance.new("UICorner")
-    MinimizeCorner.CornerRadius = UDim.new(0, 4)
-    MinimizeCorner.Parent = MinimizeButton
-
-    -- Content Frame
-    local Content = Instance.new("Frame")
-    Content.Name = "Content"
-    Content.Size = UDim2.new(1, -10, 1, -35)
-    Content.Position = UDim2.new(0, 5, 0, 30)
-    Content.BackgroundTransparency = 1
-    Content.Parent = Frame
-
-    -- === 3 INPUTS IN 1 ROW ===
-    local InputRow = Instance.new("Frame")
-    InputRow.Size = UDim2.new(1, 0, 0, 55)
-    InputRow.Position = UDim2.new(0, 0, 0, 0)
-    InputRow.BackgroundTransparency = 1
-    InputRow.Parent = Content
-
-    -- Height Input (Column 1)
-    local HeightCol = Instance.new("Frame")
-    HeightCol.Size = UDim2.new(0.33, -2, 1, 0)
-    HeightCol.Position = UDim2.new(0, 0, 0, 0)
-    HeightCol.BackgroundTransparency = 1
-    HeightCol.Parent = InputRow
-
-    local HeightBox = Instance.new("TextBox")
-    HeightBox.Size = UDim2.new(1, 0, 0, 22)
-    HeightBox.Position = UDim2.new(0, 0, 0, 0)
-    HeightBox.Text = tostring(DEFAULT_HEIGHT)
-    HeightBox.PlaceholderText = "Height"
-    HeightBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-    HeightBox.TextColor3 = Color3.new(1, 1, 1)
-    HeightBox.Font = Enum.Font.Gotham
-    HeightBox.TextSize = 10
-    HeightBox.TextXAlignment = Enum.TextXAlignment.Center
-    HeightBox.Parent = HeightCol
-
-    local HeightCorner = Instance.new("UICorner")
-    HeightCorner.CornerRadius = UDim.new(0, 4)
-    HeightCorner.Parent = HeightBox
-
-    local HeightLabel = Instance.new("TextLabel")
-    HeightLabel.Size = UDim2.new(1, 0, 0, 15)
-    HeightLabel.Position = UDim2.new(0, 0, 0, 24)
-    HeightLabel.Text = "Height"
-    HeightLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    HeightLabel.BackgroundTransparency = 1
-    HeightLabel.Font = Enum.Font.Gotham
-    HeightLabel.TextSize = 9
-    HeightLabel.TextXAlignment = Enum.TextXAlignment.Center
-    HeightLabel.Parent = HeightCol
-
-    -- Delay Input (Column 2)
-    local DelayCol = Instance.new("Frame")
-    DelayCol.Size = UDim2.new(0.33, -2, 1, 0)
-    DelayCol.Position = UDim2.new(0.34, 0, 0, 0)
-    DelayCol.BackgroundTransparency = 1
-    DelayCol.Parent = InputRow
-
-    local DelayBox = Instance.new("TextBox")
-    DelayBox.Size = UDim2.new(1, 0, 0, 22)
-    DelayBox.Position = UDim2.new(0, 0, 0, 0)
-    DelayBox.Text = tostring(DEFAULT_DELAY)
-    DelayBox.PlaceholderText = "Delay"
-    DelayBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-    DelayBox.TextColor3 = Color3.new(1, 1, 1)
-    DelayBox.Font = Enum.Font.Gotham
-    DelayBox.TextSize = 10
-    DelayBox.TextXAlignment = Enum.TextXAlignment.Center
-    DelayBox.Parent = DelayCol
-
-    local DelayCorner = Instance.new("UICorner")
-    DelayCorner.CornerRadius = UDim.new(0, 4)
-    DelayCorner.Parent = DelayBox
-
-    local DelayLabel = Instance.new("TextLabel")
-    DelayLabel.Size = UDim2.new(1, 0, 0, 15)
-    DelayLabel.Position = UDim2.new(0, 0, 0, 24)
-    DelayLabel.Text = "Delay"
-    DelayLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    DelayLabel.BackgroundTransparency = 1
-    DelayLabel.Font = Enum.Font.Gotham
-    DelayLabel.TextSize = 9
-    DelayLabel.TextXAlignment = Enum.TextXAlignment.Center
-    DelayLabel.Parent = DelayCol
-
-    -- Speed Input (Column 3)
-    local SpeedCol = Instance.new("Frame")
-    SpeedCol.Size = UDim2.new(0.33, -2, 1, 0)
-    SpeedCol.Position = UDim2.new(0.67, 0, 0, 0)
-    SpeedCol.BackgroundTransparency = 1
-    SpeedCol.Parent = InputRow
-
-    local SpeedBox = Instance.new("TextBox")
-    SpeedBox.Size = UDim2.new(1, 0, 0, 22)
-    SpeedBox.Position = UDim2.new(0, 0, 0, 0)
-    SpeedBox.Text = "500"
-    SpeedBox.PlaceholderText = "Speed"
-    SpeedBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-    SpeedBox.TextColor3 = Color3.new(1, 1, 1)
-    SpeedBox.Font = Enum.Font.Gotham
-    SpeedBox.TextSize = 10
-    SpeedBox.TextXAlignment = Enum.TextXAlignment.Center
-    SpeedBox.Parent = SpeedCol
-
-    local SpeedCorner = Instance.new("UICorner")
-    SpeedCorner.CornerRadius = UDim.new(0, 4)
-    SpeedCorner.Parent = SpeedBox
-
-    local SpeedLabel = Instance.new("TextLabel")
-    SpeedLabel.Size = UDim2.new(1, 0, 0, 15)
-    SpeedLabel.Position = UDim2.new(0, 0, 0, 24)
-    SpeedLabel.Text = "Speed"
-    SpeedLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    SpeedLabel.BackgroundTransparency = 1
-    SpeedLabel.Font = Enum.Font.Gotham
-    SpeedLabel.TextSize = 9
-    SpeedLabel.TextXAlignment = Enum.TextXAlignment.Center
-    SpeedLabel.Parent = SpeedCol
-
-    -- LOCK SECTION: Only Lock Speed and Sync (Lock Delay REMOVED)
-    local LockSection = Instance.new("Frame")
-    LockSection.Size = UDim2.new(1, 0, 0, 45)
-    LockSection.Position = UDim2.new(0, 0, 0, 60)
-    LockSection.BackgroundTransparency = 1
-    LockSection.Parent = Content
-
-    -- ROW 1: Lock Speed
-    local Row1 = Instance.new("Frame")
-    Row1.Size = UDim2.new(1, 0, 0, 20)
-    Row1.Position = UDim2.new(0, 0, 0, 0)
-    Row1.BackgroundTransparency = 1
-    Row1.Parent = LockSection
-
-    local LockSpeedBox = Instance.new("TextButton")
-    LockSpeedBox.Size = UDim2.new(0, 15, 0, 15)
-    LockSpeedBox.Position = UDim2.new(0, 5, 0, 2)
-    LockSpeedBox.Text = ""
-    LockSpeedBox.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    LockSpeedBox.Parent = Row1
-
-    local LockSpeedCorner = Instance.new("UICorner")
-    LockSpeedCorner.CornerRadius = UDim.new(0, 3)
-    LockSpeedCorner.Parent = LockSpeedBox
-
-    local LockSpeedLabel = Instance.new("TextLabel")
-    LockSpeedLabel.Size = UDim2.new(1, -25, 1, 0)
-    LockSpeedLabel.Position = UDim2.new(0, 25, 0, 0)
-    LockSpeedLabel.Text = "Lock Speed"
-    LockSpeedLabel.TextColor3 = Color3.new(1, 1, 1)
-    LockSpeedLabel.BackgroundTransparency = 1
-    LockSpeedLabel.Font = Enum.Font.Gotham
-    LockSpeedLabel.TextSize = 10
-    LockSpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-    LockSpeedLabel.Parent = Row1
-
-    -- ROW 2: Sync Delay = Win
-    local Row2 = Instance.new("Frame")
-    Row2.Size = UDim2.new(1, 0, 0, 20)
-    Row2.Position = UDim2.new(0, 0, 0, 25)
-    Row2.BackgroundTransparency = 1
-    Row2.Parent = LockSection
-
-    local SyncToggle = Instance.new("TextButton")
-    SyncToggle.Size = UDim2.new(0, 15, 0, 15)
-    SyncToggle.Position = UDim2.new(0, 5, 0, 2)
-    SyncToggle.Text = ""
-    SyncToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    SyncToggle.Parent = Row2
-
-    local SyncCorner = Instance.new("UICorner")
-    SyncCorner.CornerRadius = UDim.new(0, 3)
-    SyncCorner.Parent = SyncToggle
-
-    local SyncLabel = Instance.new("TextLabel")
-    SyncLabel.Size = UDim2.new(1, -25, 1, 0)
-    SyncLabel.Position = UDim2.new(0, 25, 0, 0)
-    SyncLabel.Text = "Sync Delay = Win"
-    SyncLabel.TextColor3 = Color3.new(1, 1, 1)
-    SyncLabel.BackgroundTransparency = 1
-    SyncLabel.Font = Enum.Font.Gotham
-    SyncLabel.TextSize = 10
-    SyncLabel.TextXAlignment = Enum.TextXAlignment.Left
-    SyncLabel.Parent = Row2
-
-    -- === CWT INDICATORS WITH GREEN/RED LIGHTS (50% smaller, left of text) ===
-    local CWTFrame = Instance.new("Frame")
-    CWTFrame.Size = UDim2.new(1, 0, 0, 25)
-    CWTFrame.Position = UDim2.new(0, 0, 0, 110)
-    CWTFrame.BackgroundTransparency = 1
-    CWTFrame.Parent = Content
-
-    -- Coin Indicator (light + label in one row)
-    local CoinIndicator = Instance.new("Frame")
-    CoinIndicator.Size = UDim2.new(0.33, -2, 1, 0)
-    CoinIndicator.Position = UDim2.new(0, 0, 0, 0)
-    CoinIndicator.BackgroundTransparency = 1
-    CoinIndicator.Parent = CWTFrame
-
-    local CoinLight = Instance.new("Frame")
-    CoinLight.Size = UDim2.new(0, 6, 0, 6)  -- 50% smaller (was 12x12)
-    CoinLight.Position = UDim2.new(0, 3, 0.5, -3)
-    CoinLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- RED default
-    CoinLight.Parent = CoinIndicator
-
-    local CoinLightCorner = Instance.new("UICorner")
-    CoinLightCorner.CornerRadius = UDim.new(0, 3)
-    CoinLightCorner.Parent = CoinLight
-
-    local CoinLabel = Instance.new("TextLabel")
-    CoinLabel.Size = UDim2.new(1, -10, 1, 0)
-    CoinLabel.Position = UDim2.new(0, 10, 0, 0)
-    CoinLabel.Text = "Coin"
-    CoinLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    CoinLabel.BackgroundTransparency = 1
-    CoinLabel.Font = Enum.Font.Gotham
-    CoinLabel.TextSize = 9
-    CoinLabel.TextXAlignment = Enum.TextXAlignment.Left
-    CoinLabel.Parent = CoinIndicator
-
-    -- Win Indicator (light + label in one row)
-    local WinIndicator = Instance.new("Frame")
-    WinIndicator.Size = UDim2.new(0.33, -2, 1, 0)
-    WinIndicator.Position = UDim2.new(0.34, 0, 0, 0)
-    WinIndicator.BackgroundTransparency = 1
-    WinIndicator.Parent = CWTFrame
-
-    local WinLight = Instance.new("Frame")
-    WinLight.Size = UDim2.new(0, 6, 0, 6)  -- 50% smaller (was 12x12)
-    WinLight.Position = UDim2.new(0, 3, 0.5, -3)
-    WinLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- RED default
-    WinLight.Parent = WinIndicator
-
-    local WinLightCorner = Instance.new("UICorner")
-    WinLightCorner.CornerRadius = UDim.new(0, 3)
-    WinLightCorner.Parent = WinLight
-
-    local WinLabel = Instance.new("TextLabel")
-    WinLabel.Size = UDim2.new(1, -10, 1, 0)
-    WinLabel.Position = UDim2.new(0, 10, 0, 0)
-    WinLabel.Text = "Win"
-    WinLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    WinLabel.BackgroundTransparency = 1
-    WinLabel.Font = Enum.Font.Gotham
-    WinLabel.TextSize = 9
-    WinLabel.TextXAlignment = Enum.TextXAlignment.Left
-    WinLabel.Parent = WinIndicator
-
-    -- Token Indicator (light + label in one row)
-    local TokenIndicator = Instance.new("Frame")
-    TokenIndicator.Size = UDim2.new(0.33, -2, 1, 0)
-    TokenIndicator.Position = UDim2.new(0.67, 0, 0, 0)
-    TokenIndicator.BackgroundTransparency = 1
-    TokenIndicator.Parent = CWTFrame
-
-    local TokenLight = Instance.new("Frame")
-    TokenLight.Size = UDim2.new(0, 6, 0, 6)  -- 50% smaller (was 12x12)
-    TokenLight.Position = UDim2.new(0, 3, 0.5, -3)
-    TokenLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- RED default
-    TokenLight.Parent = TokenIndicator
-
-    local TokenLightCorner = Instance.new("UICorner")
-    TokenLightCorner.CornerRadius = UDim.new(0, 3)
-    TokenLightCorner.Parent = TokenLight
-
-    local TokenLabel = Instance.new("TextLabel")
-    TokenLabel.Size = UDim2.new(1, -10, 1, 0)
-    TokenLabel.Position = UDim2.new(0, 10, 0, 0)
-    TokenLabel.Text = "Token"
-    TokenLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    TokenLabel.BackgroundTransparency = 1
-    TokenLabel.Font = Enum.Font.Gotham
-    TokenLabel.TextSize = 9
-    TokenLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TokenLabel.Parent = TokenIndicator
-
-    -- Main Button
-    local MainButton = Instance.new("TextButton")
-    MainButton.Size = UDim2.new(1, 0, 0, 28)
-    MainButton.Position = UDim2.new(0, 0, 0, 140)
-    MainButton.Text = "START"
-    MainButton.Font = Enum.Font.GothamBold
-    MainButton.TextSize = 12
-    MainButton.TextColor3 = Color3.new(1, 1, 1)
-    MainButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-    MainButton.Parent = Content
-
-    local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 6)
-    MainCorner.Parent = MainButton
-
-    -- Toggle Buttons Frame
-    local ToggleFrame = Instance.new("Frame")
-    ToggleFrame.Size = UDim2.new(1, 0, 0, 25)
-    ToggleFrame.Position = UDim2.new(0, 0, 0, 173)
-    ToggleFrame.BackgroundTransparency = 1
-    ToggleFrame.Parent = Content
-
-    -- Auto Win Toggle
-    local WinButton = Instance.new("TextButton")
-    WinButton.Size = UDim2.new(0.48, 0, 1, 0)
-    WinButton.Position = UDim2.new(0, 0, 0, 0)
-    WinButton.Text = "WIN: OFF"
-    WinButton.Font = Enum.Font.Gotham
-    WinButton.TextSize = 10
-    WinButton.TextColor3 = Color3.new(1, 1, 1)
-    WinButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    WinButton.Parent = ToggleFrame
-
-    local WinCorner = Instance.new("UICorner")
-    WinCorner.CornerRadius = UDim.new(0, 6)
-    WinCorner.Parent = WinButton
-
-    -- Auto Token Toggle
-    local TokenButton = Instance.new("TextButton")
-    TokenButton.Size = UDim2.new(0.48, 0, 1, 0)
-    TokenButton.Position = UDim2.new(0.52, 0, 0, 0)
-    TokenButton.Text = "TOKEN: OFF"
-    TokenButton.Font = Enum.Font.Gotham
-    TokenButton.TextSize = 10
-    TokenButton.TextColor3 = Color3.new(1, 1, 1)
-    TokenButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    TokenButton.Parent = ToggleFrame
-
-    local TokenCorner = Instance.new("UICorner")
-    TokenCorner.CornerRadius = UDim.new(0, 6)
-    TokenCorner.Parent = TokenButton
-
-    -- Status Message
-    local StatusMessage = Instance.new("TextLabel")
-    StatusMessage.Size = UDim2.new(1, 0, 0, 18)
-    StatusMessage.Position = UDim2.new(0, 0, 0, 203)
-    StatusMessage.Text = "JUMP FROM TOWER FIRST"
-    StatusMessage.TextColor3 = Color3.fromRGB(255, 100, 100)
-    StatusMessage.BackgroundTransparency = 1
-    StatusMessage.Font = Enum.Font.GothamBold
-    StatusMessage.TextSize = 10
-    StatusMessage.TextXAlignment = Enum.TextXAlignment.Center
-    StatusMessage.Parent = Content
-
-    -- Store references
-    return {
-        MainFrame = MainFrame,
-        Frame = Frame,
-        Content = Content,
-        HeightBox = HeightBox,
-        DelayBox = DelayBox,
-        SpeedBox = SpeedBox,
-        CoinLight = CoinLight,
-        WinLight = WinLight,
-        TokenLight = TokenLight,
-        StartStopButton = MainButton,
-        AutoWinToggle = WinButton,
-        AutoTokenToggle = TokenButton,
-        StatusMessage = StatusMessage,
-        MinimizeButton = MinimizeButton,
-        CloseButton = CloseButton,
-        LockSpeedCheckbox = LockSpeedBox,
-        SyncToggle = SyncToggle
-    }
+-- REMOTE
+local function SendRemote(event, ...)
+    local ev = RS:FindFirstChild("ProMgs") and RS.ProMgs:FindFirstChild("RemoteEvent")
+    if ev then ev:FireServer(event, ...) end
 end
 
------- REMOTE EVENT FUNCTIONS ------
-local function SendRemoteEvent(eventName, ...)
-    local args = {eventName, ...}
-    ReplicatedStorage:WaitForChild("ProMgs"):WaitForChild("RemoteEvent"):FireServer(unpack(args))
-end
-
-local function SendJumpData()
-    if State.jumpID then
-        local height = tonumber(GUI.HeightBox.Text) or CalculateHeight()
-        SendRemoteEvent("JumpResults", State.jumpID, height)
+local function SendJump()
+    if S.jumpID then 
+        local height = tonumber(S.heightBox and S.heightBox.Text) or CalculateHeight()
+        SendRemote("JumpResults", S.jumpID, height)
     end
 end
 
-local function SendLandingData()
-    if State.landingID then
-        SendRemoteEvent("LandingResults", State.landingID)
+local function SendLanding()
+    if S.landingID then SendRemote("LandingResults", S.landingID) end
+end
+
+local function SendWin()
+    if S.winID then SendRemote("ClaimRooftopWinsReward", S.winID); S.lastWinTime = os.time() end
+end
+
+local function SendToken()
+    if S.magicTokenID then SendRemote("ClaimRooftopMagicToken", S.magicTokenID) end
+end
+
+-- ADD RESULT
+local function AddResult(text, color)
+    if not S.resultList then return end
+    S.resultCount = S.resultCount + 1
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1,-4,0,16)
+    lbl.Position = UDim2.new(0,2,0,(S.resultCount-1)*17)
+    lbl.BackgroundTransparency = 1
+    lbl.TextColor3 = color or Color3.fromRGB(200,200,200)
+    lbl.Font = Enum.Font.SourceSans
+    lbl.TextSize = 11
+    lbl.Text = text
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = S.resultList
+    if S.scrollFrame then
+        S.scrollFrame.CanvasSize = UDim2.new(0,0,0,S.resultCount*17+6)
+        S.scrollFrame.CanvasPosition = Vector2.new(0,S.scrollFrame.CanvasSize.Y.Offset)
     end
 end
 
-local function SendWinData()
-    if State.winID then
-        SendRemoteEvent("ClaimRooftopWinsReward", State.winID)
-        State.lastWinTime = os.time()
-        State.lastWinClaim = os.time()
+-- CLEAR LOG
+local function ClearLog()
+    if S.running then return end
+    for _, child in pairs(S.resultList:GetChildren()) do
+        child:Destroy()
     end
+    S.resultCount = 0
+    if S.scrollFrame then
+        S.scrollFrame.CanvasSize = UDim2.new(0,0,0,0)
+    end
+    AddResult("🗑️ Log cleared", Color3.fromRGB(255,200,0))
 end
 
-local function SendTokenData()
-    if State.magicTokenID then
-        SendRemoteEvent("ClaimRooftopMagicToken", State.magicTokenID)
-        State.lastTokenClaim = os.time()
-    end
-end
-
------- CORE LOGIC ------
-local function UpdateCWTIndicators()
-    -- Coin: GREEN if jumpID AND landingID exist, else RED
-    if State.jumpID and State.landingID then
-        GUI.CoinLight.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- GREEN
+-- UPDATE COOLDOWN
+local function UpdateCooldowns()
+    if not S.coinCooldown then return end
+    local now = os.time()
+    local delay = GetDelay()
+    
+    if S.syncEnabled then
+        local elapsed = now - S.lastLoopTime
+        local remaining = math.max(0, delay - elapsed)
+        local color = remaining > 2 and Color3.fromRGB(255,200,100) or Color3.fromRGB(100,255,100)
+        
+        S.coinCooldown.Text = S.running and S.modeCoin and string.format("%.1fs", remaining) or "⏸️"
+        S.coinCooldown.TextColor3 = S.running and S.modeCoin and color or Color3.fromRGB(150,150,150)
+        
+        S.winCooldown.Text = (S.running and S.modeWin and S.winID) and string.format("%.1fs", remaining) or (not S.winID and "❌" or "⏸️")
+        S.winCooldown.TextColor3 = (S.running and S.modeWin and S.winID) and color or (not S.winID and Color3.fromRGB(255,50,50) or Color3.fromRGB(150,150,150))
+        
+        S.tokenCooldown.Text = (S.running and S.modeToken and S.magicTokenID) and string.format("%.1fs", remaining) or (not S.magicTokenID and "❌" or "⏸️")
+        S.tokenCooldown.TextColor3 = (S.running and S.modeToken and S.magicTokenID) and color or (not S.magicTokenID and Color3.fromRGB(255,50,50) or Color3.fromRGB(150,150,150))
     else
-        GUI.CoinLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- RED
-    end
-
-    -- Win: GREEN if winID exists, else RED
-    if State.winID then
-        GUI.WinLight.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- GREEN
-    else
-        GUI.WinLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- RED
-    end
-
-    -- Token: GREEN if magicTokenID exists, else RED
-    if State.magicTokenID then
-        GUI.TokenLight.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- GREEN
-    else
-        GUI.TokenLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- RED
+        -- Coin
+        if S.running and S.modeCoin then
+            local remaining = math.max(0, delay - (now - S.lastLoopTime))
+            S.coinCooldown.Text = string.format("%.1fs", remaining)
+            S.coinCooldown.TextColor3 = remaining > 2 and Color3.fromRGB(255,200,100) or Color3.fromRGB(100,255,100)
+        else
+            S.coinCooldown.Text = "⏸️"
+            S.coinCooldown.TextColor3 = Color3.fromRGB(150,150,150)
+        end
+        
+        -- Win
+        if S.running and S.modeWin and S.winID then
+            local remaining = math.max(0, GetWinDelay() - (now - S.lastWinTime))
+            S.winCooldown.Text = string.format("%.1fs", remaining)
+            S.winCooldown.TextColor3 = remaining > 2 and Color3.fromRGB(255,200,100) or Color3.fromRGB(100,255,100)
+        else
+            S.winCooldown.Text = not S.winID and "❌" or "⏸️"
+            S.winCooldown.TextColor3 = not S.winID and Color3.fromRGB(255,50,50) or Color3.fromRGB(150,150,150)
+        end
+        
+        -- Token
+        if S.running and S.modeToken and S.magicTokenID then
+            local tokenDelay = GetTokenDelay()
+            local remaining = math.max(0, (tokenDelay/2) - (now - S.lastLoopTime))
+            S.tokenCooldown.Text = string.format("%.1fs", remaining)
+            S.tokenCooldown.TextColor3 = remaining > 2 and Color3.fromRGB(255,200,100) or Color3.fromRGB(100,255,100)
+        else
+            S.tokenCooldown.Text = not S.magicTokenID and "❌" or "⏸️"
+            S.tokenCooldown.TextColor3 = not S.magicTokenID and Color3.fromRGB(255,50,50) or Color3.fromRGB(150,150,150)
+        end
     end
 end
 
+-- UPDATE STATUS
 local function UpdateStatus()
-    UpdateCWTIndicators()
-
-    if State.jumpID and State.landingID then
-        State.isReady = true
-        GUI.StartStopButton.BackgroundColor3 = State.running and Color3.fromRGB(0, 200, 50) or Color3.fromRGB(0, 150, 0)
-        if not State.running then
-            GUI.StatusMessage.Text = "READY TO START!"
-            GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-        end
-    else
-        State.isReady = false
-        GUI.StartStopButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        GUI.StatusMessage.Text = "JUMP FROM TOWER FIRST"
-        GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 100, 100)
+    if S.coinLight then
+        S.coinLight.BackgroundColor3 = (S.jumpID and S.landingID) and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+        S.winLight.BackgroundColor3 = S.winID and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+        S.tokenLight.BackgroundColor3 = S.magicTokenID and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
     end
+    
+    local ready = S.jumpID and S.landingID
+    S.isReady = ready
+    if S.startStopButton then
+        S.startStopButton.Text = S.running and "⏹ STOP" or "▶ START"
+        S.startStopButton.BackgroundColor3 = S.running and Color3.fromRGB(200,50,50) or Color3.fromRGB(40,160,40)
+    end
+    if S.statusLabel then
+        S.statusLabel.Text = ready and (S.running and "RUNNING" or "READY! Mode: "..GetModeDesc()) or "JUMP FROM TOWER FIRST"
+        S.statusLabel.TextColor3 = ready and Color3.fromRGB(100,255,100) or Color3.fromRGB(255,100,100)
+    end
+    if not S.running then
+        if S.progressText then S.progressText.Text = "0%" end
+        if S.progressBar then S.progressBar.Size = UDim2.new(0,0,1,0) end
+    end
+    UpdateSpeedBox()
+    UpdateDelayBox()
+    if not S.running then UpdateHeight() end
+    UpdateCooldowns()
 end
 
-local function UpdateStatusMessage(coinStatus, winStatus, tokenStatus)
-    local statusText = ""
-
-    if coinStatus == "claimed" then
-        statusText = statusText .. "C:✓ "
-    elseif coinStatus == "waiting" then
-        statusText = statusText .. "C:⏳ "
-    elseif coinStatus == "ready" then
-        statusText = statusText .. "C:▶ "
-    else
-        statusText = statusText .. "C:○ "
+local function UpdateStatusMsg(c, w, t)
+    if not S.statusLabel then return end
+    local txt = ""
+    txt = txt .. (c == "claimed" and "C:✓ " or c == "waiting" and "C:⏳ " or c == "ready" and "C:▶ " or "C:○ ")
+    txt = txt .. (w == "claimed" and "W:✓ " or w == "waiting" and "W:⏳ " or w == "ready" and "W:▶ " or "W:○ ")
+    txt = txt .. (t == "claimed" and "T:✓" or t == "waiting" and "T:⏳" or t == "ready" and "T:▶" or "T:○")
+    S.statusLabel.Text = txt .. " | " .. GetModeDesc()
+    S.statusLabel.TextColor3 = Color3.fromRGB(100,255,100)
+    if S.progressText then S.progressText.Text = "RUNNING" end
+    if S.progressBar then
+        S.progressBar.Size = UDim2.new(1,0,1,0)
+        S.progressBar.BackgroundColor3 = Color3.fromRGB(0,200,0)
     end
-
-    if winStatus == "claimed" then
-        statusText = statusText .. "W:✓ "
-    elseif winStatus == "waiting" then
-        statusText = statusText .. "W:⏳ "
-    elseif winStatus == "ready" then
-        statusText = statusText .. "W:▶ "
-    else
-        statusText = statusText .. "W:○ "
-    end
-
-    if tokenStatus == "claimed" then
-        statusText = statusText .. "T:✓"
-    elseif tokenStatus == "waiting" then
-        statusText = statusText .. "T:⏳"
-    elseif tokenStatus == "ready" then
-        statusText = statusText .. "T:▶"
-    else
-        statusText = statusText .. "T:○"
-    end
-
-    GUI.StatusMessage.Text = statusText
-    GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
+    UpdateSpeedBox()
+    UpdateDelayBox()
+    UpdateCooldowns()
 end
 
+-- MAIN LOOP
 local function RunLoop()
-    while State.running and State.hookEnabled do
-        local internalDelay = tonumber(GUI.DelayBox.Text) or DEFAULT_DELAY
-
-        -- Apply auto token delay formula when enabled
-        if State.autoTokenEnabled then
-            local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
-            if currentSpeed > 0 then
-                internalDelay = math.floor((10000 / currentSpeed) * 10) / 10
-                GUI.DelayBox.Text = string.format("%.1f", internalDelay)
-            end
-        end
-
-        State.lastLoopTime = os.time()
-        State.nextLoopTime = State.lastLoopTime + internalDelay
-
-        UpdateStatusMessage("ready", "ready", "ready")
-
-        -- Handle auto token at midpoint
-        if State.autoTokenEnabled and State.magicTokenID then
-            local tokenTime = State.lastLoopTime + (internalDelay / 2)
-            while os.time() < tokenTime and State.running and State.hookEnabled do
-                local remaining = tokenTime - os.time()
-                local winRemaining = GetWinDelay() - (os.time() - State.lastWinTime)
-
-                local coinStatus = string.format("%.1fs", remaining)
-                local winStatus = State.autoWinEnabled and string.format("%.1fs", winRemaining > 0 and winRemaining or 0) or "off"
-                local tokenStatus = string.format("%.1fs", remaining)
-
-                GUI.StatusMessage.Text = string.format("C:%s W:%s T:%s", coinStatus, winStatus, tokenStatus)
-                GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 200, 100)
+    AddResult("===== MULAI LOOP =====", Color3.fromRGB(100,200,255))
+    AddResult("Mode: "..GetModeDesc(), Color3.fromRGB(255,200,0))
+    
+    while S.running and S.hookEnabled do
+        local delay = GetDelay()
+        S.lastLoopTime = os.time()
+        S.nextLoopTime = S.lastLoopTime + delay
+        UpdateStatusMsg("ready","ready","ready")
+        
+        if S.syncEnabled then
+            while os.time() < S.nextLoopTime and S.running and S.hookEnabled do
                 task.wait(0.1)
             end
-            if State.running and State.hookEnabled then
-                SendTokenData()
-                State.lastTokenClaim = os.time()
-                UpdateStatusMessage("claimed", "ready", "claimed")
-                task.wait(0.3)
+            if not S.running or not S.hookEnabled then break end
+            
+            local claims = {}
+            if S.modeCoin then SendJump(); SendLanding(); table.insert(claims, "🪙") end
+            if S.modeWin and S.winID then SendWin(); table.insert(claims, "🏆") end
+            if S.modeToken and S.magicTokenID then SendToken(); table.insert(claims, "✨") end
+            if #claims > 0 then
+                AddResult("✅ "..table.concat(claims, " + "), Color3.fromRGB(0,255,0))
+                S.syncLoopCount = S.syncLoopCount + 1
             end
-        end
-
-        -- Handle auto win with dynamic delay
-        local currentWinDelay = GetWinDelay()
-        if State.autoWinEnabled and os.time() - State.lastWinTime >= currentWinDelay then
-            SendWinData()
-            State.lastWinClaim = os.time()
-            UpdateStatusMessage("ready", "claimed", "ready")
+            UpdateStatusMsg("claimed","claimed","claimed")
             task.wait(0.3)
+        else
+            -- Token midpoint
+            if S.modeToken and S.magicTokenID then
+                local tokenTime = S.lastLoopTime + (GetTokenDelay() / 2)
+                while os.time() < tokenTime and S.running and S.hookEnabled do
+                    task.wait(0.1)
+                end
+                if S.running and S.hookEnabled then
+                    SendToken(); AddResult("✅ ✨ Token", Color3.fromRGB(0,255,0)); UpdateStatusMsg("claimed","ready","claimed"); task.wait(0.3)
+                end
+            end
+            
+            -- Win
+            local winDelay = GetWinDelay()
+            if S.modeWin and os.time() - S.lastWinTime >= winDelay then
+                SendWin(); AddResult("✅ 🏆 Win ("..string.format("%.1fs",winDelay)..")", Color3.fromRGB(0,255,0)); UpdateStatusMsg("ready","claimed","ready"); task.wait(0.3)
+            end
+            
+            while os.time() < S.nextLoopTime and S.running and S.hookEnabled do
+                task.wait(0.1)
+            end
+            if not S.running or not S.hookEnabled then break end
+            
+            SendJump(); SendLanding(); AddResult("✅ 🪙 Coin", Color3.fromRGB(0,255,0)); UpdateStatusMsg("claimed","ready","ready"); task.wait(0.3)
         end
-
-        -- Wait remaining time with status updates
-        local loopStartTime = os.time()
-        while os.time() < State.nextLoopTime and State.running and State.hookEnabled do
-            local remaining = State.nextLoopTime - os.time()
-            local winRemaining = currentWinDelay - (os.time() - State.lastWinTime)
-
-            local coinStatus = string.format("%.1fs", remaining)
-            local winStatus = State.autoWinEnabled and string.format("%.1fs", winRemaining > 0 and winRemaining or 0) or "off"
-            local tokenStatus = State.autoTokenEnabled and string.format("%.1fs", remaining) or "off"
-
-            GUI.StatusMessage.Text = string.format("C:%s W:%s T:%s", coinStatus, winStatus, tokenStatus)
-            GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 200, 100)
-            task.wait(0.1)
-        end
-
-        if not State.running or not State.hookEnabled then break end
-
-        -- Execute coin actions
-        SendJumpData()
-        SendLandingData()
-        State.lastCoinClaim = os.time()
-        UpdateStatusMessage("claimed", "ready", "ready")
-        task.wait(0.3)
-
-        -- Auto-pause system
-        State.runTime = State.runTime + (os.time() - State.lastLoopTime)
-        if State.runTime >= PAUSE_INTERVAL then
-            State.running = false
-            GUI.StatusMessage.Text = "PAUSED 30s"
-            GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 100, 100)
+        
+        -- Pause
+        S.runTime = S.runTime + (os.time() - S.lastLoopTime)
+        if S.runTime >= PAUSE_INTERVAL then
+            AddResult("⏸️ PAUSED 30s", Color3.fromRGB(255,200,0))
+            S.running = false
+            if S.statusLabel then S.statusLabel.Text = "PAUSED 30s"; S.statusLabel.TextColor3 = Color3.fromRGB(255,100,100) end
+            if S.startStopButton then S.startStopButton.Text = "▶ START"; S.startStopButton.BackgroundColor3 = Color3.fromRGB(40,160,40) end
             task.wait(PAUSE_DURATION)
-            State.runTime = 0
-            State.running = true
+            S.runTime = 0; S.running = true
+            if S.startStopButton then S.startStopButton.Text = "⏹ STOP"; S.startStopButton.BackgroundColor3 = Color3.fromRGB(200,50,50) end
+            if S.syncEnabled then S.lastLoopTime = os.time(); S.lastWinTime = os.time() end
+            AddResult("▶️ Resume", Color3.fromRGB(0,255,0))
         end
     end
-
-    if State.hookEnabled then
+    if S.hookEnabled then
+        AddResult("⏹️ LOOP BERHENTI", Color3.fromRGB(255,200,0))
         UpdateStatus()
     end
 end
 
------- CLIMB SPEED METER LOGIC ------
+-- CLIMB DETECTION
 local function SetupCharacter(char)
-    local humanoid = char:WaitForChild("Humanoid")
-
-    humanoid.StateChanged:Connect(function(_, new)
+    local hum = char:WaitForChild("Humanoid")
+    hum.StateChanged:Connect(function(_, new)
         if new == Enum.HumanoidStateType.Climbing then
-            State.climbStartY = char:WaitForChild("HumanoidRootPart").Position.Y
-            State.climbStartTime = tick()
-            State.maxY = State.climbStartY
-            State.climbing = true
-            GUI.StatusMessage.Text = "CLIMBING..."
-            GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 200, 100)
-        else
-            if State.climbing then
-                local climbEndY = State.maxY
-                local climbEndTime = tick()
-                local totalY = climbEndY - State.climbStartY
-                local totalTime = climbEndTime - State.climbStartTime
-
-                if totalY > 0 and totalTime > 0 then
-                    State.climbSpeed = totalY / totalTime
-                    GUI.SpeedBox.Text = string.format("%.2f", State.climbSpeed)
-
-                    if State.lockSpeed and State.lockedSpeed == 0 then
-                        State.lockedSpeed = State.climbSpeed
-                        GUI.StatusMessage.Text = "SPEED LOCKED: " .. string.format("%.2f", State.lockedSpeed)
-                        GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-                        task.wait(1.5)
-                        if State.running then
-                            UpdateStatusMessage("ready", "ready", "ready")
-                        else
-                            UpdateStatus()
-                        end
-                    end
-
-                    UpdateHeight()
-
-                    if State.autoTokenEnabled then
-                        local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
-                        if currentSpeed > 0 then
-                            local newDelay = math.floor((10000 / currentSpeed) * 10) / 10
-                            GUI.DelayBox.Text = string.format("%.1f", newDelay)
-                        end
-                    end
-
-                    -- Auto sync if sync toggle is enabled
-                    if State.syncEnabled then
-                        SyncDelayWithWin()
-                    end
-
-                    if State.autoWinEnabled then
-                        GUI.StatusMessage.Text = string.format("WIN DELAY: %.1fs", GetWinDelay())
-                        GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-                        task.wait(2)
-                        if State.running then
-                            UpdateStatusMessage("ready", "ready", "ready")
-                        else
-                            UpdateStatus()
-                        end
-                    else
-                        if State.running then
-                            UpdateStatusMessage("ready", "ready", "ready")
-                        else
-                            UpdateStatus()
-                        end
-                    end
+            S.climbStartY = char:WaitForChild("HumanoidRootPart").Position.Y
+            S.climbStartTime = tick(); S.maxY = S.climbStartY; S.climbing = true
+            if S.statusLabel then S.statusLabel.Text = "CLIMBING..."; S.statusLabel.TextColor3 = Color3.fromRGB(255,200,100) end
+            AddResult("🧗 Climbing...", Color3.fromRGB(255,200,100))
+        elseif S.climbing then
+            local totalY = S.maxY - S.climbStartY
+            local totalT = tick() - S.climbStartTime
+            if totalY > 0 and totalT > 0 then
+                S.climbSpeed = totalY / totalT
+                UpdateSpeedBox()
+                AddResult(string.format("📊 Speed: %.2f | H: %d", S.climbSpeed, totalY), Color3.fromRGB(100,200,255))
+                
+                if S.lockSpeed and S.lockedSpeed == 0 then
+                    S.lockedSpeed = S.climbSpeed
+                    if S.statusLabel then S.statusLabel.Text = "SPEED LOCKED: "..string.format("%.2f",S.lockedSpeed); S.statusLabel.TextColor3 = Color3.fromRGB(100,255,100) end
+                    AddResult("🔒 Speed Locked: "..string.format("%.2f",S.lockedSpeed), Color3.fromRGB(100,255,100))
+                    UpdateSpeedBox(); task.wait(1.5)
+                    if S.running then UpdateStatusMsg("ready","ready","ready") else UpdateStatus() end
                 end
-                State.climbing = false
+                
+                if S.syncEnabled then SyncDelay() end
+                UpdateHeight()
+                AddResult(string.format("📏 Height: %d (Delay: %.1fs)", CalculateHeight(), GetDelay()), Color3.fromRGB(100,200,255))
+                
+                if S.modeWin then
+                    if S.statusLabel then S.statusLabel.Text = "WIN DELAY: "..string.format("%.1fs", GetWinDelay()); S.statusLabel.TextColor3 = Color3.fromRGB(100,255,100) end
+                    task.wait(2)
+                    if S.running then UpdateStatusMsg("ready","ready","ready") else UpdateStatus() end
+                else
+                    if S.running then UpdateStatusMsg("ready","ready","ready") else UpdateStatus() end
+                end
             end
+            S.climbing = false
         end
     end)
-
     RunService.Heartbeat:Connect(function()
-        if State.climbing and char:FindFirstChild("HumanoidRootPart") then
+        if S.climbing and char:FindFirstChild("HumanoidRootPart") then
             local y = char.HumanoidRootPart.Position.Y
-            if y > State.maxY then
-                State.maxY = y
-            end
+            if y > S.maxY then S.maxY = y end
         end
+        UpdateCooldowns()
     end)
 end
 
------- EVENT HANDLERS ------
-local function InitializeEventHandlers()
-    -- Start/Stop button
-    GUI.StartStopButton.MouseButton1Click:Connect(function()
-        if State.isReady then
-            State.running = not State.running
-            if State.running then
-                GUI.StartStopButton.Text = "STOP"
-                GUI.StartStopButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-                State.lastWinTime = os.time()
-                coroutine.wrap(RunLoop)()
-            else
-                GUI.StartStopButton.Text = "START"
-                GUI.StartStopButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-                UpdateStatus()
-            end
+-- BUILD GUI
+local function BuildGUI()
+    local app = Infinity.new({
+        title = "AUTO COIN V4",
+        delay = 5, heroId = 7000001, mode = "farming", compact = true,
+        tabs = {{name="MAIN",active=true},{name="STATS",active=false},{name="LOGS",active=false}}
+    })
+    
+    -- NONAKTIFKAN SEMUA ELEMEN YANG TIDAK DIPAKAI
+    -- 1. Nonaktifkan notifikasi
+    app.notify = function() end
+    
+    -- 2. Hapus status label bawaan library
+    app.buildMainTab = function(self, parent, fLabel, fInput, fInfo, fResult, fProgress, fButton)
+        -- HAPUS STATUS LABEL BAWAAN LIBRARY
+        if self.statusLabel then
+            self.statusLabel:Destroy()
+            self.statusLabel = nil
         end
-    end)
-
-    -- Auto Win toggle
-    GUI.AutoWinToggle.MouseButton1Click:Connect(function()
-        if State.winID then
-            State.autoWinEnabled = not State.autoWinEnabled
-            if State.autoWinEnabled then
-                GUI.AutoWinToggle.Text = "WIN: ON"
-                GUI.AutoWinToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-                State.lastWinTime = os.time()
-                if State.climbSpeed > 0 then
-                    GUI.StatusMessage.Text = string.format("WIN DELAY: %.1fs", GetWinDelay())
-                    GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-                    task.wait(2)
-                    if State.running then
-                        UpdateStatusMessage("ready", "ready", "ready")
-                    else
-                        UpdateStatus()
-                    end
+        
+        -- HAPUS PROGRESS BAR BAWAAN LIBRARY jika ada
+        if self.progressBar then
+            self.progressBar:Destroy()
+            self.progressBar = nil
+        end
+        if self.progressText then
+            self.progressText:Destroy()
+            self.progressText = nil
+        end
+        
+        -- BUTTONS
+        local btns = Instance.new("Frame")
+        btns.Size = UDim2.new(1, 0, 0, 24)
+        btns.Position = UDim2.new(0, 0, 1, -24)
+        btns.BackgroundTransparency = 1
+        btns.Parent = parent
+        
+        -- START/STOP Button
+        self.testButton = Instance.new("TextButton")
+        self.testButton.Size = UDim2.new(0.68, -3, 1, 0)
+        self.testButton.Position = UDim2.new(0, 0, 0, 0)
+        self.testButton.Text = "▶ START"
+        self.testButton.BackgroundColor3 = Color3.fromRGB(40, 160, 40)
+        self.testButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        self.testButton.Font = Enum.Font.SourceSansBold
+        self.testButton.TextSize = 11
+        self.testButton.Parent = btns
+        Instance.new("UICorner").CornerRadius = UDim.new(0, 3); Instance.new("UICorner").Parent = self.testButton
+        S.startStopButton = self.testButton
+        
+        -- CLEAR LOG Button
+        self.clearButton = Instance.new("TextButton")
+        self.clearButton.Size = UDim2.new(0.30, -3, 1, 0)
+        self.clearButton.Position = UDim2.new(0.70, 0, 0, 0)
+        self.clearButton.Text = "🗑️ CLEAR"
+        self.clearButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        self.clearButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        self.clearButton.Font = Enum.Font.SourceSansBold
+        self.clearButton.TextSize = 9
+        self.clearButton.Parent = btns
+        Instance.new("UICorner").CornerRadius = UDim.new(0, 3); Instance.new("UICorner").Parent = self.clearButton
+        S.clearLogButton = self.clearButton
+        
+        self.clearButton.MouseButton1Click:Connect(ClearLog)
+        self.clearButton.MouseEnter:Connect(function()
+            self.clearButton.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
+        end)
+        self.clearButton.MouseLeave:Connect(function()
+            self.clearButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        end)
+        
+        -- CONTENT FRAME
+        local cf = Instance.new("Frame")
+        cf.Size = UDim2.new(1, 0, 1, -24)
+        cf.Position = UDim2.new(0, 0, 0, 0)
+        cf.BackgroundColor3 = Color3.fromRGB(30,30,35)
+        cf.BackgroundTransparency = 0.3
+        cf.BorderSizePixel = 0
+        cf.ClipsDescendants = false
+        cf.Parent = parent
+        Instance.new("UICorner").CornerRadius = UDim.new(0,3); Instance.new("UICorner").Parent = cf
+        
+        -- STATUS LABEL (kita buat sendiri)
+        self.statusLabel = Instance.new("TextLabel")
+        self.statusLabel.Size = UDim2.new(1, -8, 0, 16)
+        self.statusLabel.Position = UDim2.new(0, 4, 0, 2)
+        self.statusLabel.BackgroundTransparency = 1
+        self.statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        self.statusLabel.Font = Enum.Font.SourceSans
+        self.statusLabel.TextSize = 10
+        self.statusLabel.Text = "Status: Siap..."
+        self.statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+        self.statusLabel.Visible = true
+        self.statusLabel.Parent = cf
+        S.statusLabel = self.statusLabel
+        
+        -- Input Row
+        local row = Instance.new("Frame")
+        row.Size = UDim2.new(1,0,0,42)
+        row.Position = UDim2.new(0,0,0,20)
+        row.BackgroundTransparency = 1
+        row.Parent = cf
+        
+        local function makeInput(col, label, default)
+            local c = Instance.new("Frame")
+            c.Size = UDim2.new(0.33,-2,1,0)
+            c.Position = UDim2.new(col,0,0,0)
+            c.BackgroundTransparency = 1
+            c.Parent = row
+            
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1,0,0,12)
+            lbl.Position = UDim2.new(0,0,0,0)
+            lbl.Text = label
+            lbl.TextColor3 = Color3.fromRGB(180,180,180)
+            lbl.BackgroundTransparency = 1
+            lbl.Font = Enum.Font.Gotham
+            lbl.TextSize = 8
+            lbl.TextXAlignment = Enum.TextXAlignment.Center
+            lbl.Parent = c
+            
+            local box = Instance.new("TextBox")
+            box.Size = UDim2.new(1,0,0,18)
+            box.Position = UDim2.new(0,0,0,12)
+            box.Text = default
+            box.BackgroundColor3 = Color3.fromRGB(45,45,50)
+            box.TextColor3 = Color3.new(1,1,1)
+            box.Font = Enum.Font.Gotham
+            box.TextSize = 10
+            box.TextXAlignment = Enum.TextXAlignment.Center
+            box.Parent = c
+            Instance.new("UICorner").CornerRadius = UDim.new(0,3); Instance.new("UICorner").Parent = box
+            return box
+        end
+        
+        S.heightBox = makeInput(0, "Height (Auto)", tostring(DEFAULT_HEIGHT))
+        S.delayBox = makeInput(0.34, "Delay", tostring(DEFAULT_DELAY))
+        S.speedBox = makeInput(0.67, "Speed", "0")
+        
+        -- Lock Section
+        local lock = Instance.new("Frame")
+        lock.Size = UDim2.new(1,0,0,24)
+        lock.Position = UDim2.new(0,0,0,64)
+        lock.BackgroundTransparency = 1
+        lock.Parent = cf
+        
+        local function makeToggle(x, label)
+            local r = Instance.new("Frame")
+            r.Size = UDim2.new(0.48,0,0,16)
+            r.Position = UDim2.new(x,0,0,0)
+            r.BackgroundTransparency = 1
+            r.Parent = lock
+            
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(0,12,0,12)
+            btn.Position = UDim2.new(0,2,0,2)
+            btn.Text = ""
+            btn.BackgroundColor3 = Color3.fromRGB(60,60,70)
+            btn.Parent = r
+            Instance.new("UICorner").CornerRadius = UDim.new(0,3); Instance.new("UICorner").Parent = btn
+            
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1,-18,1,0)
+            lbl.Position = UDim2.new(0,18,0,0)
+            lbl.Text = label
+            lbl.TextColor3 = Color3.new(1,1,1)
+            lbl.BackgroundTransparency = 1
+            lbl.Font = Enum.Font.Gotham
+            lbl.TextSize = 9
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.Parent = r
+            return btn
+        end
+        
+        S.lockSpeedCheckbox = makeToggle(0.02, "Lock Speed")
+        S.syncToggle = makeToggle(0.52, "Sync Delay")
+        
+        -- CWT Indicators
+        local cwt = Instance.new("Frame")
+        cwt.Size = UDim2.new(1,0,0,36)
+        cwt.Position = UDim2.new(0,0,0,90)
+        cwt.BackgroundTransparency = 1
+        cwt.Parent = cf
+        
+        local function makeIndicator(col, label)
+            local f = Instance.new("Frame")
+            f.Size = UDim2.new(0.33,-2,1,0)
+            f.Position = UDim2.new(col,0,0,0)
+            f.BackgroundTransparency = 1
+            f.Parent = cwt
+            
+            local check = Instance.new("TextButton")
+            check.Size = UDim2.new(0,10,0,10)
+            check.Position = UDim2.new(0,2,0.15,-5)
+            check.Text = "✓"
+            check.TextColor3 = Color3.fromRGB(0,255,0)
+            check.Font = Enum.Font.GothamBold
+            check.TextSize = 8
+            check.BackgroundColor3 = Color3.fromRGB(40,180,40)
+            check.BackgroundTransparency = 0.3
+            check.Parent = f
+            Instance.new("UICorner").CornerRadius = UDim.new(0,2); Instance.new("UICorner").Parent = check
+            
+            local light = Instance.new("Frame")
+            light.Size = UDim2.new(0,5,0,5)
+            light.Position = UDim2.new(0,16,0.15,-2)
+            light.BackgroundColor3 = Color3.fromRGB(255,0,0)
+            light.Parent = f
+            Instance.new("UICorner").CornerRadius = UDim.new(0,3); Instance.new("UICorner").Parent = light
+            
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1,-28,0,10)
+            lbl.Position = UDim2.new(0,25,0,0)
+            lbl.Text = label
+            lbl.TextColor3 = Color3.fromRGB(180,180,180)
+            lbl.BackgroundTransparency = 1
+            lbl.Font = Enum.Font.Gotham
+            lbl.TextSize = 8
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.Parent = f
+            
+            local cooldown = Instance.new("TextLabel")
+            cooldown.Size = UDim2.new(1,-28,0,13)
+            cooldown.Position = UDim2.new(0,25,0,10)
+            cooldown.Text = "⏸️"
+            cooldown.TextColor3 = Color3.fromRGB(150,150,150)
+            cooldown.BackgroundTransparency = 1
+            cooldown.Font = Enum.Font.GothamBold
+            cooldown.TextSize = 9
+            cooldown.TextXAlignment = Enum.TextXAlignment.Left
+            cooldown.Parent = f
+            
+            if label == "Coin" then S.coinCooldown = cooldown
+            elseif label == "Win" then S.winCooldown = cooldown
+            else S.tokenCooldown = cooldown end
+            
+            local isActive = (label == "Win" and S.modeWin) or (label == "Token" and S.modeToken) or (label == "Coin" and S.modeCoin)
+            if not isActive then check.Text = ""; check.BackgroundColor3 = Color3.fromRGB(60,60,70) end
+            
+            check.MouseButton1Click:Connect(function()
+                if label == "Coin" then
+                    S.modeCoin = not S.modeCoin
+                    check.Text = S.modeCoin and "✓" or ""; check.BackgroundColor3 = S.modeCoin and Color3.fromRGB(40,180,40) or Color3.fromRGB(60,60,70)
+                    AddResult(S.modeCoin and "🪙 Coin: ON" or "🪙 Coin: OFF", S.modeCoin and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,100,100))
+                elseif label == "Win" then
+                    if not S.winID then AddResult("⚠️ Belum ada Win ID!", Color3.fromRGB(255,100,0)); return end
+                    S.modeWin = not S.modeWin
+                    check.Text = S.modeWin and "✓" or ""; check.BackgroundColor3 = S.modeWin and Color3.fromRGB(40,180,40) or Color3.fromRGB(60,60,70)
+                    if S.modeWin then S.lastWinTime = os.time() end
+                    AddResult(S.modeWin and "🏆 Win: ON" or "🏆 Win: OFF", S.modeWin and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,100,100))
+                elseif label == "Token" then
+                    if not S.magicTokenID then AddResult("⚠️ Belum ada Token ID!", Color3.fromRGB(255,100,0)); return end
+                    S.modeToken = not S.modeToken
+                    check.Text = S.modeToken and "✓" or ""; check.BackgroundColor3 = S.modeToken and Color3.fromRGB(40,180,40) or Color3.fromRGB(60,60,70)
+                    AddResult(S.modeToken and "✨ Token: ON" or "✨ Token: OFF", S.modeToken and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,100,100))
                 end
-            else
-                GUI.AutoWinToggle.Text = "WIN: OFF"
-                GUI.AutoWinToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
                 UpdateStatus()
-            end
+            end)
+            
+            if label == "Coin" then S.coinLight = light; S.coinCheck = check
+            elseif label == "Win" then S.winLight = light; S.winCheck = check
+            else S.tokenLight = light; S.tokenCheck = check end
+            
+            return light, check, cooldown
         end
-    end)
+        
+        makeIndicator(0, "Coin")
+        makeIndicator(0.34, "Win")
+        makeIndicator(0.67, "Token")
+        
+        -- Results
+        self.scrollFrame = Instance.new("ScrollingFrame")
+        self.scrollFrame.Size = UDim2.new(1, 0, 1, -148)
+        self.scrollFrame.Position = UDim2.new(0, 0, 0, 128)
+        self.scrollFrame.BackgroundColor3 = Color3.fromRGB(25,25,30)
+        self.scrollFrame.BackgroundTransparency = 0.3
+        self.scrollFrame.BorderSizePixel = 0
+        self.scrollFrame.Parent = cf
+        Instance.new("UICorner").CornerRadius = UDim.new(0,3); Instance.new("UICorner").Parent = self.scrollFrame
+        S.scrollFrame = self.scrollFrame
+        
+        self.resultList = Instance.new("Frame")
+        self.resultList.Size = UDim2.new(1,0,0,0)
+        self.resultList.BackgroundTransparency = 1
+        self.resultList.Parent = self.scrollFrame
+        S.resultList = self.resultList
+        self.scrollFrame.CanvasSize = UDim2.new(0,0,0,0)
+        self.resultCount = 0
+        
+        -- Progress
+        local prog = Instance.new("Frame")
+        prog.Size = UDim2.new(1, 0, 0, 10)
+        prog.Position = UDim2.new(0, 0, 1, -10)
+        prog.BackgroundColor3 = Color3.fromRGB(30,30,35)
+        prog.BackgroundTransparency = 0.3
+        prog.BorderSizePixel = 0
+        prog.Parent = cf
+        Instance.new("UICorner").CornerRadius = UDim.new(0,2); Instance.new("UICorner").Parent = prog
+        
+        self.progressBar = Instance.new("Frame")
+        self.progressBar.Size = UDim2.new(0,0,1,0)
+        self.progressBar.BackgroundColor3 = Color3.fromRGB(40,180,40)
+        self.progressBar.BackgroundTransparency = 0.5
+        self.progressBar.BorderSizePixel = 0
+        self.progressBar.Parent = prog
+        Instance.new("UICorner").CornerRadius = UDim.new(0,2); Instance.new("UICorner").Parent = self.progressBar
+        S.progressBar = self.progressBar
+        
+        self.progressText = Instance.new("TextLabel")
+        self.progressText.Size = UDim2.new(1,0,1,0)
+        self.progressText.BackgroundTransparency = 1
+        self.progressText.TextColor3 = Color3.fromRGB(255,255,255)
+        self.progressText.Font = Enum.Font.SourceSansBold
+        self.progressText.TextSize = 9
+        self.progressText.Text = "0%"
+        self.progressText.Parent = prog
+        S.progressText = self.progressText
+        
+        return cf
+    end
+    
+    app:buildGUI()
+    S.app = app; S.gui = app.gui; S.mainFrame = app.mainFrame
+    return app
+end
 
-    -- Auto Token toggle
-    GUI.AutoTokenToggle.MouseButton1Click:Connect(function()
-        if State.magicTokenID then
-            State.autoTokenEnabled = not State.autoTokenEnabled
-            if State.autoTokenEnabled then
-                GUI.AutoTokenToggle.Text = "TOKEN: ON"
-                GUI.AutoTokenToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-                local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
-                if currentSpeed > 0 then
-                    local newDelay = math.floor((10000 / currentSpeed) * 10) / 10
-                    GUI.DelayBox.Text = string.format("%.1f", newDelay)
-                end
-            else
-                GUI.AutoTokenToggle.Text = "TOKEN: OFF"
-                GUI.AutoTokenToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-                UpdateStatus()
-            end
-        end
-    end)
-
-    -- Sync Toggle
-    GUI.SyncToggle.MouseButton1Click:Connect(function()
-        State.syncEnabled = not State.syncEnabled
-        if State.syncEnabled then
-            GUI.SyncToggle.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-            GUI.StatusMessage.Text = "SYNC ENABLED"
-            GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-            if State.climbSpeed > 0 then
-                SyncDelayWithWin()
-            end
-            task.wait(1.5)
-            if State.running then
-                UpdateStatusMessage("ready", "ready", "ready")
-            else
-                UpdateStatus()
-            end
-        else
-            GUI.SyncToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-            GUI.StatusMessage.Text = "SYNC DISABLED"
-            GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 100, 100)
-            task.wait(1.5)
-            if State.running then
-                UpdateStatusMessage("ready", "ready", "ready")
-            else
-                UpdateStatus()
-            end
-        end
-    end)
-
-    -- Lock Speed Checkbox
-    GUI.LockSpeedCheckbox.MouseButton1Click:Connect(function()
-        State.lockSpeed = not State.lockSpeed
-        if State.lockSpeed then
-            GUI.LockSpeedCheckbox.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-            if State.climbSpeed > 0 then
-                State.lockedSpeed = State.climbSpeed
-                GUI.StatusMessage.Text = "SPEED LOCKED: " .. string.format("%.2f", State.lockedSpeed)
-                GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-                task.wait(1.5)
-                if State.running then
-                    UpdateStatusMessage("ready", "ready", "ready")
+-- EVENT HANDLERS
+local function SetupEvents()
+    if S.startStopButton then
+        S.startStopButton.MouseButton1Click:Connect(function()
+            if S.isReady then
+                S.running = not S.running
+                if S.running then
+                    S.startStopButton.Text = "⏹ STOP"
+                    S.startStopButton.BackgroundColor3 = Color3.fromRGB(200,50,50)
+                    S.lastWinTime = os.time(); S.runTime = 0; S.syncLoopCount = 0
+                    if S.syncEnabled then S.lastLoopTime = os.time() end
+                    if S.progressText then S.progressText.Text = "RUNNING" end
+                    if S.progressBar then S.progressBar.Size = UDim2.new(1,0,1,0); S.progressBar.BackgroundColor3 = Color3.fromRGB(0,200,0) end
+                    AddResult("▶️ STARTED - Mode: "..GetModeDesc(), Color3.fromRGB(0,255,0))
+                    coroutine.wrap(RunLoop)()
                 else
+                    S.startStopButton.Text = "▶ START"
+                    S.startStopButton.BackgroundColor3 = Color3.fromRGB(40,160,40)
+                    AddResult("⏹️ STOPPED", Color3.fromRGB(255,200,0))
                     UpdateStatus()
                 end
             else
-                GUI.StatusMessage.Text = "WAITING FOR SPEED..."
-                GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 200, 100)
+                AddResult("⚠️ Lompat dari tower dulu!", Color3.fromRGB(255,100,0))
             end
-        else
-            GUI.LockSpeedCheckbox.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-            State.lockedSpeed = 0
-            GUI.StatusMessage.Text = "SPEED UNLOCKED"
-            GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-            task.wait(1.5)
-            if State.running then
-                UpdateStatusMessage("ready", "ready", "ready")
+        end)
+    end
+    
+    if S.lockSpeedCheckbox then
+        S.lockSpeedCheckbox.MouseButton1Click:Connect(function()
+            S.lockSpeed = not S.lockSpeed
+            if S.lockSpeed then
+                S.lockSpeedCheckbox.BackgroundColor3 = Color3.fromRGB(100,200,100)
+                if S.climbSpeed > 0 then
+                    S.lockedSpeed = S.climbSpeed
+                    if S.statusLabel then S.statusLabel.Text = "SPEED LOCKED: "..string.format("%.2f",S.lockedSpeed); S.statusLabel.TextColor3 = Color3.fromRGB(100,255,100) end
+                    AddResult("🔒 Speed Locked: "..string.format("%.2f",S.lockedSpeed), Color3.fromRGB(100,255,100))
+                    UpdateSpeedBox(); UpdateHeight()
+                    if S.syncEnabled then SyncDelay() end
+                    task.wait(1.5)
+                    if S.running then UpdateStatusMsg("ready","ready","ready") else UpdateStatus() end
+                else
+                    if S.statusLabel then S.statusLabel.Text = "WAITING FOR SPEED..."; S.statusLabel.TextColor3 = Color3.fromRGB(255,200,100) end
+                    AddResult("⏳ Menunggu speed...", Color3.fromRGB(255,200,100))
+                end
             else
-                UpdateStatus()
+                S.lockSpeedCheckbox.BackgroundColor3 = Color3.fromRGB(60,60,70)
+                S.lockedSpeed = 0
+                if S.statusLabel then S.statusLabel.Text = "SPEED UNLOCKED"; S.statusLabel.TextColor3 = Color3.fromRGB(100,255,100) end
+                AddResult("🔓 Speed Unlocked", Color3.fromRGB(100,255,100))
+                UpdateSpeedBox(); UpdateHeight()
+                if S.syncEnabled then SyncDelay() end
+                task.wait(1.5)
+                if S.running then UpdateStatusMsg("ready","ready","ready") else UpdateStatus() end
             end
-        end
-    end)
-
-    -- Delay box change handler
-    GUI.DelayBox:GetPropertyChangedSignal("Text"):Connect(function()
-        if State.climbSpeed > 0 then
-            UpdateHeight()
-        end
-    end)
-
-    -- Minimize button
-    GUI.MinimizeButton.MouseButton1Click:Connect(function()
-        State.minimized = not State.minimized
-        if State.minimized then
-            GUI.Frame.Size = UDim2.new(0, 100, 0, 25)
-            GUI.MinimizeButton.Text = "+"
-            GUI.Content.Visible = false
-        else
-            GUI.Frame.Size = UDim2.new(0, 200, 0, 290)
-            GUI.MinimizeButton.Text = "-"
-            GUI.Content.Visible = true
-        end
-    end)
-
-    -- Close button
-    GUI.CloseButton.MouseButton1Click:Connect(function()
-        State.hookEnabled = false
-        GUI.MainFrame:Destroy()
-    end)
+        end)
+    end
+    
+    if S.syncToggle then
+        S.syncToggle.MouseButton1Click:Connect(function()
+            S.syncEnabled = not S.syncEnabled
+            if S.syncEnabled then
+                S.syncToggle.BackgroundColor3 = Color3.fromRGB(100,200,100)
+                if S.statusLabel then S.statusLabel.Text = "SYNC ENABLED"; S.statusLabel.TextColor3 = Color3.fromRGB(100,255,100) end
+                AddResult("🔄 SYNC ON - Loop bareng", Color3.fromRGB(100,255,100))
+                if S.climbSpeed > 0 then SyncDelay() else S.syncedDelay = GetDelay(); S.lastLoopTime = os.time(); S.lastWinTime = os.time(); UpdateDelayBox() end
+                task.wait(1.5)
+                if S.running then UpdateStatusMsg("ready","ready","ready") else UpdateStatus() end
+            else
+                S.syncToggle.BackgroundColor3 = Color3.fromRGB(60,60,70)
+                if S.statusLabel then S.statusLabel.Text = "SYNC DISABLED"; S.statusLabel.TextColor3 = Color3.fromRGB(255,100,100) end
+                AddResult("🔄 SYNC OFF - Terpisah", Color3.fromRGB(255,100,100))
+                S.syncedDelay = S.manualDelay; UpdateDelayBox()
+                task.wait(1.5)
+                if S.running then UpdateStatusMsg("ready","ready","ready") else UpdateStatus() end
+            end
+        end)
+    end
+    
+    if S.delayBox then
+        S.delayBox:GetPropertyChangedSignal("Text"):Connect(function()
+            local val = tonumber(S.delayBox.Text)
+            if val and val > 0 then S.manualDelay = val; if S.syncEnabled then S.syncedDelay = val end; UpdateHeight() end
+        end)
+    end
 end
 
------- REMOTE EVENT HOOK ------
-local function InitializeRemoteHook()
-    local remoteEvent = ReplicatedStorage:WaitForChild("ProMgs"):WaitForChild("RemoteEvent")
-    local oldNamecall
-
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        if not State.hookEnabled then
-            return oldNamecall(self, ...)
-        end
-
+-- REMOTE HOOK
+local function InitRemoteHook()
+    local ev = RS:FindFirstChild("ProMgs") and RS.ProMgs:FindFirstChild("RemoteEvent")
+    if not ev then return end
+    local old
+    old = hookmetamethod(game, "__namecall", function(self, ...)
+        if not S.hookEnabled then return old(self, ...) end
         local args = {...}
         local method = getnamecallmethod()
-
-        if self == remoteEvent and method == "FireServer" then
-            local eventType = args[1]
-            local eventID = args[2]
-
-            if typeof(eventID) == "number" then
-                if eventType == "JumpResults" then
-                    State.jumpID = eventID
-                elseif eventType == "LandingResults" then
-                    State.landingID = eventID
-                elseif eventType == "ClaimRooftopWinsReward" then
-                    State.winID = eventID
-                elseif eventType == "ClaimRooftopMagicToken" then
-                    State.magicTokenID = eventID
-                end
-
+        if self == ev and method == "FireServer" then
+            local eType, eID = args[1], args[2]
+            if typeof(eID) == "number" then
+                if eType == "JumpResults" then S.jumpID = eID
+                elseif eType == "LandingResults" then S.landingID = eID
+                elseif eType == "ClaimRooftopWinsReward" then S.winID = eID
+                elseif eType == "ClaimRooftopMagicToken" then S.magicTokenID = eID end
                 UpdateStatus()
             end
         end
-
-        return oldNamecall(self, ...)
+        return old(self, ...)
     end)
 end
 
------- INITIALIZATION ------
--- Create GUI
-GUI = CreateGUI()
-
--- Set up event handlers
-InitializeEventHandlers()
-InitializeRemoteHook()
-
--- Set up character climbing detection
-local LocalPlayer = Players.LocalPlayer
-if LocalPlayer.Character then
-    SetupCharacter(LocalPlayer.Character)
+-- COOLDOWN UPDATER
+local function StartCooldownUpdater()
+    coroutine.wrap(function()
+        while S.hookEnabled do
+            UpdateCooldowns()
+            task.wait(0.1)
+        end
+    end)()
 end
-LocalPlayer.CharacterAdded:Connect(SetupCharacter)
 
-print("Auto Coin V3 - CWT Lights 50% Smaller & Left of Text - Loaded Successfully!")
+-- INIT
+local app = BuildGUI()
+SetupEvents()
+InitRemoteHook()
+StartCooldownUpdater()
+
+local lp = Players.LocalPlayer
+if lp.Character then SetupCharacter(lp.Character) end
+lp.CharacterAdded:Connect(SetupCharacter)
+
+task.wait(0.5)
+UpdateStatus()
+
+AddResult("✅ AUTO COIN V4 - Siap!", Color3.fromRGB(0,255,0))
+AddResult("📌 Mode: "..GetModeDesc(), Color3.fromRGB(255,200,0))
+AddResult("📌 START/STOP 1 tombol | CLEAR LOG", Color3.fromRGB(100,200,255))
+AddResult("📌 Lompat dari tower untuk memulai", Color3.fromRGB(255,200,100))
+
+print("AUTO COIN V4 - UI Updated!")
