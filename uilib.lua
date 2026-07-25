@@ -301,10 +301,29 @@ function CAJTUI:CreateTab(config)
     table.insert(data.Tabs, tabData)
     table.insert(window._tabs, tabData)
 
-    -- If first tab, activate it
-    if #data.Tabs == 1 then
-        tabBtn.MouseButton1Click:Fire()
+   -- If first tab, activate it
+if #data.Tabs == 1 then
+    -- Panggil fungsi aktivasi langsung
+    tabBtn.MouseButton1Click:Connect(function() end) -- Hanya untuk testing
+    -- Atau lebih baik, panggil logika aktivasi langsung
+    for _, btn in pairs(data.TabContainer:GetChildren()) do
+        if btn:IsA("TextButton") then
+            btn.BackgroundTransparency = 0.5
+            btn.TextColor3 = Theme.TextSecondary
+            btn.BackgroundColor3 = Theme.Surface
+        end
     end
+    for _, panel in pairs(data.ContentContainer:GetChildren()) do
+        if panel:IsA("ScrollingFrame") then
+            panel.Visible = false
+        end
+    end
+    tabBtn.BackgroundTransparency = 0.1
+    tabBtn.TextColor3 = Theme.Primary
+    tabBtn.BackgroundColor3 = Theme.SurfaceLight
+    contentPanel.Visible = true
+    data.ActiveTab = tabBtn
+end
 
     -- Return tab object
     return setmetatable({
