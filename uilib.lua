@@ -30,14 +30,6 @@ local function CreateStroke(instance, color, thickness)
     return stroke
 end
 
-local function CreateShadow(instance, size, color)
-    local shadow = Instance.new("UIShadow")
-    shadow.Size = size or 8
-    shadow.Color = color or Color3.fromRGB(0, 0, 0)
-    shadow.Parent = instance
-    return shadow
-end
-
 --// ============================================
 --// THEME
 --// ============================================
@@ -55,7 +47,6 @@ local Theme = {
     TextSecondary = Color3.fromRGB(160, 160, 170),
     TextMuted = Color3.fromRGB(100, 100, 110),
     Border = Color3.fromRGB(50, 50, 55),
-    Shadow = Color3.fromRGB(0, 0, 0),
 }
 
 --// ============================================
@@ -80,11 +71,11 @@ function CAJTUI:CreateWindow(config)
     frame.Draggable = true
     frame.Active = true
     frame.ClipsDescendants = true
-    
+
     CreateCorner(frame, 10)
     CreateStroke(frame, Theme.Border, 1)
 
-    -- Shadow
+    -- Shadow (tanpa Size)
     local shadow = Instance.new("UIShadow")
     shadow.Color = Color3.fromRGB(0, 0, 0)
     shadow.Parent = frame
@@ -123,7 +114,7 @@ function CAJTUI:CreateWindow(config)
     closeBtn.TextSize = 14
     closeBtn.Parent = titleBar
     CreateCorner(closeBtn, 6)
-    
+
     closeBtn.MouseEnter:Connect(function()
         closeBtn.BackgroundTransparency = 0.1
     end)
@@ -147,7 +138,7 @@ function CAJTUI:CreateWindow(config)
     minBtn.TextSize = 18
     minBtn.Parent = titleBar
     CreateCorner(minBtn, 6)
-    
+
     local minimized = false
     minBtn.MouseEnter:Connect(function()
         minBtn.BackgroundTransparency = 0.1
@@ -173,18 +164,18 @@ function CAJTUI:CreateWindow(config)
     navBar.BorderSizePixel = 0
     navBar.Parent = frame
 
-    -- Tab Container (Scrolling untuk banyak tab)
-local tabContainer = Instance.new("ScrollingFrame")
-tabContainer.Size = UDim2.new(1, -10, 1, 0)
-tabContainer.Position = UDim2.new(0, 5, 0, 0)
-tabContainer.BackgroundTransparency = 1
-tabContainer.BorderSizePixel = 0
-tabContainer.ScrollBarThickness = 3
-tabContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-tabContainer.AutomaticCanvasSize = Enum.AutomaticSize.X
-tabContainer.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Left
-tabContainer.ScrollingDirection = Enum.ScrollingDirection.X  -- ✅ TAMBAHKAN INI
-tabContainer.Parent = navBar
+    -- Tab Container (dengan scroll horizontal)
+    local tabContainer = Instance.new("ScrollingFrame")
+    tabContainer.Size = UDim2.new(1, -10, 1, 0)
+    tabContainer.Position = UDim2.new(0, 5, 0, 0)
+    tabContainer.BackgroundTransparency = 1
+    tabContainer.BorderSizePixel = 0
+    tabContainer.ScrollBarThickness = 3
+    tabContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+    tabContainer.AutomaticCanvasSize = Enum.AutomaticSize.X
+    tabContainer.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Left
+    tabContainer.ScrollingDirection = Enum.ScrollingDirection.X
+    tabContainer.Parent = navBar
 
     -- Content Container
     local contentContainer = Instance.new("Frame")
@@ -205,7 +196,7 @@ tabContainer.Parent = navBar
     }
 
     table.insert(UIInstances.Windows, windowData)
-    
+
     -- Return window object
     local window = setmetatable({
         _data = windowData,
@@ -216,7 +207,7 @@ tabContainer.Parent = navBar
     }, {
         __index = CAJTUI,
     })
-    
+
     return window
 end
 
@@ -226,10 +217,10 @@ end
 function CAJTUI:CreateTab(config)
     local window = self
     local data = window._data
-    
-    -- Create Tab Button
+
+    -- Create Tab Button (lebar 120px)
     local tabBtn = Instance.new("TextButton")
-    tabBtn.Size = UDim2.new(0, 100, 1, -6)
+    tabBtn.Size = UDim2.new(0, 120, 1, -6)
     tabBtn.Position = UDim2.new(0, 0, 0, 3)
     tabBtn.Text = config.Title or "Tab"
     tabBtn.TextColor3 = Theme.TextSecondary
@@ -241,7 +232,7 @@ function CAJTUI:CreateTab(config)
     tabBtn.Parent = data.TabContainer
     CreateCorner(tabBtn, 6)
 
-    -- Tab Content Panel
+    -- Tab Content Panel (dengan scroll vertikal)
     local contentPanel = Instance.new("ScrollingFrame")
     contentPanel.Size = UDim2.new(1, -20, 1, -10)
     contentPanel.Position = UDim2.new(0, 10, 0, 5)
@@ -250,6 +241,8 @@ function CAJTUI:CreateTab(config)
     contentPanel.ScrollBarThickness = 4
     contentPanel.CanvasSize = UDim2.new(0, 0, 0, 0)
     contentPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    contentPanel.ScrollingDirection = Enum.ScrollingDirection.Y
+    contentPanel.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Right
     contentPanel.Visible = false
     contentPanel.Parent = data.ContentContainer
 
@@ -282,11 +275,10 @@ function CAJTUI:CreateTab(config)
                 panel.Visible = false
             end
         end
-        
+
         -- Activate this tab
         tabBtn.BackgroundTransparency = 0.1
         tabBtn.TextColor3 = Theme.Primary
-        tabBtn.BackgroundColor3 = Theme.Primary
         tabBtn.BackgroundColor3 = Theme.SurfaceLight
         contentPanel.Visible = true
         data.ActiveTab = tabBtn
@@ -302,28 +294,27 @@ function CAJTUI:CreateTab(config)
     table.insert(data.Tabs, tabData)
     table.insert(window._tabs, tabData)
 
-  -- If first tab, activate it
-if #data.Tabs == 1 then
-    -- Aktivasi manual tab pertama
-    for _, btn in pairs(data.TabContainer:GetChildren()) do
-        if btn:IsA("TextButton") then
-            btn.BackgroundTransparency = 0.5
-            btn.TextColor3 = Theme.TextSecondary
-            btn.BackgroundColor3 = Theme.Surface
+    -- If first tab, activate it (manual tanpa Fire)
+    if #data.Tabs == 1 then
+        for _, btn in pairs(data.TabContainer:GetChildren()) do
+            if btn:IsA("TextButton") then
+                btn.BackgroundTransparency = 0.5
+                btn.TextColor3 = Theme.TextSecondary
+                btn.BackgroundColor3 = Theme.Surface
+            end
         end
-    end
-    for _, panel in pairs(data.ContentContainer:GetChildren()) do
-        if panel:IsA("ScrollingFrame") then
-            panel.Visible = false
+        for _, panel in pairs(data.ContentContainer:GetChildren()) do
+            if panel:IsA("ScrollingFrame") then
+                panel.Visible = false
+            end
         end
+        tabBtn.BackgroundTransparency = 0.1
+        tabBtn.TextColor3 = Theme.Primary
+        tabBtn.BackgroundColor3 = Theme.SurfaceLight
+        contentPanel.Visible = true
+        data.ActiveTab = tabBtn
     end
-    tabBtn.BackgroundTransparency = 0.1
-    tabBtn.TextColor3 = Theme.Primary
-    tabBtn.BackgroundColor3 = Theme.SurfaceLight
-    contentPanel.Visible = true
-    data.ActiveTab = tabBtn
-end
-    
+
     -- Return tab object
     return setmetatable({
         _data = tabData,
@@ -341,9 +332,9 @@ function CAJTUI:CreateSection(config)
     local tab = self
     local panel = tab._panel
 
-    -- Section container
+    -- Section container (dengan default height 100)
     local section = Instance.new("Frame")
-    section.Size = UDim2.new(1, 0, 0, config.Height or 0)
+    section.Size = UDim2.new(1, 0, 0, config.Height or 100)
     section.BackgroundColor3 = Theme.Surface
     section.BackgroundTransparency = 0.1
     section.BorderSizePixel = 0
@@ -401,9 +392,8 @@ function CAJTUI:CreateButton(config)
     local section = self
     local content = section._content
 
-    -- Auto adjust height
     local height = config.Height or 32
-    
+
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -20, 0, height)
     btn.Position = UDim2.new(0, 10, 0, #section._data.Components * (height + 6) + 5)
@@ -417,7 +407,6 @@ function CAJTUI:CreateButton(config)
     btn.Parent = content
     CreateCorner(btn, 6)
 
-    -- Hover
     btn.MouseEnter:Connect(function()
         btn.BackgroundTransparency = 0.2
     end)
@@ -425,7 +414,6 @@ function CAJTUI:CreateButton(config)
         btn.BackgroundTransparency = 0.1
     end)
 
-    -- Click
     btn.MouseButton1Click:Connect(function()
         if config.Callback then
             task.spawn(config.Callback)
@@ -433,8 +421,7 @@ function CAJTUI:CreateButton(config)
     end)
 
     table.insert(section._data.Components, btn)
-    
-    -- Update section height
+
     local totalHeight = #section._data.Components * (height + 6) + 15
     section._section.Size = UDim2.new(1, 0, 0, totalHeight)
 
@@ -450,8 +437,7 @@ function CAJTUI:CreateInput(config)
 
     local height = config.Height or 28
     local label = nil
-    
-    -- Label jika ada
+
     if config.Title then
         label = Instance.new("TextLabel")
         label.Size = UDim2.new(1, -20, 0, 18)
@@ -468,7 +454,7 @@ function CAJTUI:CreateInput(config)
 
     local yOffset = #section._data.Components * (height + 30) + 5
     if label then yOffset = yOffset + 20 end
-    
+
     local input = Instance.new("TextBox")
     input.Size = UDim2.new(1, -20, 0, height)
     input.Position = UDim2.new(0, 10, 0, yOffset)
@@ -484,14 +470,12 @@ function CAJTUI:CreateInput(config)
     input.Parent = content
     CreateCorner(input, 6)
 
-    -- Update position for next component
     local totalHeight = #section._data.Components * (height + 30) + 40
     if label then totalHeight = totalHeight + 22 end
     section._section.Size = UDim2.new(1, 0, 0, totalHeight)
 
-    -- Store value
     local value = input.Text
-    
+
     input:GetPropertyChangedSignal("Text"):Connect(function()
         value = input.Text
         if config.Callback then
@@ -501,7 +485,6 @@ function CAJTUI:CreateInput(config)
         end
     end)
 
-    -- Return input object with methods
     return {
         _input = input,
         Set = function(self, text)
@@ -523,15 +506,13 @@ function CAJTUI:CreateToggle(config)
 
     local height = 30
     local yOffset = #section._data.Components * (height + 6) + 5
-    
-    -- Container
+
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, -20, 0, height)
     container.Position = UDim2.new(0, 10, 0, yOffset)
     container.BackgroundTransparency = 1
     container.Parent = content
 
-    -- Label
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(0.7, 0, 1, 0)
     label.BackgroundTransparency = 1
@@ -542,7 +523,6 @@ function CAJTUI:CreateToggle(config)
     label.TextSize = 13
     label.Parent = container
 
-    -- Toggle Button
     local toggle = Instance.new("TextButton")
     toggle.Size = UDim2.new(0, 44, 0, 24)
     toggle.Position = UDim2.new(1, -44, 0.5, -12)
@@ -552,7 +532,6 @@ function CAJTUI:CreateToggle(config)
     toggle.Parent = container
     CreateCorner(toggle, 12)
 
-    -- Toggle Indicator
     local indicator = Instance.new("Frame")
     indicator.Size = UDim2.new(0, 18, 0, 18)
     indicator.Position = UDim2.new(0, 3, 0.5, -9)
@@ -562,7 +541,7 @@ function CAJTUI:CreateToggle(config)
     CreateCorner(indicator, 9)
 
     local state = config.Default or false
-    
+
     local function updateToggle()
         if state then
             toggle.BackgroundColor3 = Theme.Primary
@@ -610,8 +589,7 @@ function CAJTUI:CreateDropdown(config)
 
     local height = 30
     local yOffset = #section._data.Components * (height + 6) + 5
-    
-    -- Label
+
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -20, 0, 18)
     label.Position = UDim2.new(0, 10, 0, yOffset)
@@ -624,7 +602,6 @@ function CAJTUI:CreateDropdown(config)
     label.Parent = content
     table.insert(section._data.Components, label)
 
-    -- Dropdown Button
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -20, 0, height)
     btn.Position = UDim2.new(0, 10, 0, yOffset + 22)
@@ -638,7 +615,6 @@ function CAJTUI:CreateDropdown(config)
     btn.Parent = content
     CreateCorner(btn, 6)
 
-    -- Dropdown List
     local list = Instance.new("Frame")
     list.Size = UDim2.new(1, -20, 0, 0)
     list.Position = UDim2.new(0, 10, 0, yOffset + 22 + height)
@@ -652,7 +628,7 @@ function CAJTUI:CreateDropdown(config)
 
     local listHeight = 0
     local optionButtons = {}
-    
+
     for i, option in ipairs(config.Options or {}) do
         local optBtn = Instance.new("TextButton")
         optBtn.Size = UDim2.new(1, 0, 0, 28)
@@ -666,14 +642,14 @@ function CAJTUI:CreateDropdown(config)
         optBtn.TextSize = 12
         optBtn.Parent = list
         CreateCorner(optBtn, 4)
-        
+
         optBtn.MouseEnter:Connect(function()
             optBtn.BackgroundTransparency = 0.3
         end)
         optBtn.MouseLeave:Connect(function()
             optBtn.BackgroundTransparency = 0.1
         end)
-        
+
         optBtn.MouseButton1Click:Connect(function()
             btn.Text = option
             list.Visible = false
@@ -684,11 +660,11 @@ function CAJTUI:CreateDropdown(config)
                 end)
             end
         end)
-        
+
         listHeight = listHeight + 28
         table.insert(optionButtons, optBtn)
     end
-    
+
     list.Size = UDim2.new(1, -20, 0, listHeight)
 
     btn.MouseButton1Click:Connect(function()
@@ -702,7 +678,7 @@ function CAJTUI:CreateDropdown(config)
 
     table.insert(section._data.Components, btn)
     table.insert(section._data.Components, list)
-    
+
     local totalHeight = #section._data.Components * (height + 40) + 30
     section._section.Size = UDim2.new(1, 0, 0, totalHeight)
 
@@ -725,7 +701,7 @@ function CAJTUI:CreateLabel(config)
 
     local height = config.Height or 20
     local yOffset = #section._data.Components * (height + 4) + 5
-    
+
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -20, 0, height)
     label.Position = UDim2.new(0, 10, 0, yOffset)
@@ -741,10 +717,8 @@ function CAJTUI:CreateLabel(config)
     label.TextWrapped = true
     label.Parent = content
 
-    -- Store the actual label for updates
     table.insert(section._data.Components, label)
-    
-    -- Auto height jika wrap
+
     local function updateHeight()
         local textSize = label.TextBounds.Y
         if textSize > height then
@@ -788,7 +762,7 @@ function CAJTUI:CreateDivider(config)
     local content = section._content
 
     local yOffset = #section._data.Components * (20 + 4) + 5
-    
+
     local divider = Instance.new("Frame")
     divider.Size = UDim2.new(1, -40, 0, 1)
     divider.Position = UDim2.new(0, 20, 0, yOffset)
@@ -797,7 +771,7 @@ function CAJTUI:CreateDivider(config)
     divider.Parent = content
 
     table.insert(section._data.Components, divider)
-    
+
     local totalHeight = #section._data.Components * 25 + 10
     section._section.Size = UDim2.new(1, 0, 0, totalHeight)
 end
@@ -822,7 +796,6 @@ function CAJTUI:Notify(config)
     CreateCorner(frame, 8)
     CreateStroke(frame, Theme.Border, 1)
 
-    -- Title
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, -20, 0, 20)
     title.Position = UDim2.new(0, 10, 0, 4)
@@ -834,7 +807,6 @@ function CAJTUI:Notify(config)
     title.TextSize = 13
     title.Parent = frame
 
-    -- Content
     local content = Instance.new("TextLabel")
     content.Size = UDim2.new(1, -20, 0, 20)
     content.Position = UDim2.new(0, 10, 0, 24)
@@ -846,7 +818,6 @@ function CAJTUI:Notify(config)
     content.TextSize = 11
     content.Parent = frame
 
-    -- Auto dismiss
     task.wait(config.Duration or 3)
     frame:TweenPosition(UDim2.new(1, -335, 0, -60), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
     task.wait(0.4)
