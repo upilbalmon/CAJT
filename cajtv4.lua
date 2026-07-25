@@ -3,17 +3,16 @@
     Features:
     1. Auto height calculation: (speed × 2.8) × delay
     2. Dynamic auto win delay: 10000 / speed
-    3. Compact 200x200 GUI
+    3. Compact 200x280 GUI
     4. All original functionality preserved
     5. Auto token delay formula: (10000/speed) with 1 decimal place
     6. Max height limit: 14400
-    7. Lock delay setting checkbox
-    8. Lock speed setting checkbox
-    9. Fixed GUI with proper sizing
-    10. Compact status display (C, W, T)
-    11. Sync Delay toggle button in 3-row layout
-    12. Fixed CWT position (NEW)
---]]
+    7. Lock speed setting checkbox
+    8. Sync Delay toggle button
+    9. CWT indicators with RED/GREEN lights (50% smaller, left of text)
+    10. Height, Delay, Speed in ONE ROW with labels below
+    11. Lock Delay checkbox REMOVED
+]]
 
 ------ SERVICES ------
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -50,7 +49,6 @@ local State = {
     climbStartY = 0,
     climbStartTime = 0,
     maxY = 0,
-    lockDelay = false,
     lockSpeed = false,
     lockedSpeed = 0,
     syncEnabled = false,
@@ -67,7 +65,7 @@ local function GetWinDelay()
 end
 
 local function CalculateHeight()
-    local delay = tonumber(GUI.DelayTextBox.Text) or DEFAULT_DELAY
+    local delay = tonumber(GUI.DelayBox.Text) or DEFAULT_DELAY
     local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
     local calculatedHeight = math.floor((currentSpeed * HEIGHT_MULTIPLIER) * delay)
     return math.min(calculatedHeight, MAX_HEIGHT)
@@ -76,14 +74,14 @@ end
 local function UpdateHeight()
     local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
     if currentSpeed > 0 then
-        GUI.HeightTextBox.Text = tostring(CalculateHeight())
+        GUI.HeightBox.Text = tostring(CalculateHeight())
     end
 end
 
 local function SyncDelayWithWin()
     local winDelay = GetWinDelay()
     if winDelay > 0 then
-        GUI.DelayTextBox.Text = string.format("%.1f", winDelay)
+        GUI.DelayBox.Text = string.format("%.1f", winDelay)
         UpdateHeight()
         GUI.StatusMessage.Text = string.format("SYNCED: %.1fs", winDelay)
         GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
@@ -117,8 +115,8 @@ local function CreateGUI()
 
     -- Main Frame
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(0, 200, 0, 275)  -- Increased height for better spacing
-    Frame.Position = UDim2.new(0.5, -100, 0.5, -137)
+    Frame.Size = UDim2.new(0, 200, 0, 290)
+    Frame.Position = UDim2.new(0.5, -100, 0.5, -145)
     Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     Frame.BackgroundTransparency = 0.1
     Frame.BorderSizePixel = 0
@@ -147,7 +145,7 @@ local function CreateGUI()
     local TitleText = Instance.new("TextLabel")
     TitleText.Size = UDim2.new(0.7, 0, 1, 0)
     TitleText.Position = UDim2.new(0.15, 0, 0, 0)
-    TitleText.Text = "CAJT AUTO GACOR"
+    TitleText.Text = "AUTO"
     TitleText.TextColor3 = Color3.new(1, 1, 1)
     TitleText.BackgroundTransparency = 1
     TitleText.Font = Enum.Font.GothamBold
@@ -192,116 +190,135 @@ local function CreateGUI()
     Content.BackgroundTransparency = 1
     Content.Parent = Frame
 
-    -- Input Frame
-    local InputFrame = Instance.new("Frame")
-    InputFrame.Size = UDim2.new(1, 0, 0, 80)
-    InputFrame.Position = UDim2.new(0, 0, 0, 0)
-    InputFrame.BackgroundTransparency = 1
-    InputFrame.Parent = Content
+    -- === 3 INPUTS IN 1 ROW ===
+    local InputRow = Instance.new("Frame")
+    InputRow.Size = UDim2.new(1, 0, 0, 55)
+    InputRow.Position = UDim2.new(0, 0, 0, 0)
+    InputRow.BackgroundTransparency = 1
+    InputRow.Parent = Content
 
-    -- Height Input
-    local HeightLabel = Instance.new("TextLabel")
-    HeightLabel.Size = UDim2.new(0.4, 0, 0, 20)
-    HeightLabel.Position = UDim2.new(0, 0, 0, 0)
-    HeightLabel.Text = "Height:"
-    HeightLabel.TextColor3 = Color3.new(1, 1, 1)
-    HeightLabel.BackgroundTransparency = 1
-    HeightLabel.Font = Enum.Font.Gotham
-    HeightLabel.TextSize = 11
-    HeightLabel.TextXAlignment = Enum.TextXAlignment.Left
-    HeightLabel.Parent = InputFrame
+    -- Height Input (Column 1)
+    local HeightCol = Instance.new("Frame")
+    HeightCol.Size = UDim2.new(0.33, -2, 1, 0)
+    HeightCol.Position = UDim2.new(0, 0, 0, 0)
+    HeightCol.BackgroundTransparency = 1
+    HeightCol.Parent = InputRow
 
     local HeightBox = Instance.new("TextBox")
-    HeightBox.Size = UDim2.new(0.6, 0, 0, 20)
-    HeightBox.Position = UDim2.new(0.4, 0, 0, 0)
+    HeightBox.Size = UDim2.new(1, 0, 0, 22)
+    HeightBox.Position = UDim2.new(0, 0, 0, 0)
     HeightBox.Text = tostring(DEFAULT_HEIGHT)
-    HeightBox.PlaceholderText = "Auto"
-    HeightBox.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    HeightBox.PlaceholderText = "Height"
+    HeightBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
     HeightBox.TextColor3 = Color3.new(1, 1, 1)
     HeightBox.Font = Enum.Font.Gotham
-    HeightBox.TextSize = 11
-    HeightBox.Parent = InputFrame
+    HeightBox.TextSize = 10
+    HeightBox.TextXAlignment = Enum.TextXAlignment.Center
+    HeightBox.Parent = HeightCol
 
     local HeightCorner = Instance.new("UICorner")
     HeightCorner.CornerRadius = UDim.new(0, 4)
     HeightCorner.Parent = HeightBox
 
-    -- Delay Input
-    local DelayLabel = Instance.new("TextLabel")
-    DelayLabel.Size = UDim2.new(0.4, 0, 0, 20)
-    DelayLabel.Position = UDim2.new(0, 0, 0, 25)
-    DelayLabel.Text = "Delay:"
-    DelayLabel.TextColor3 = Color3.new(1, 1, 1)
-    DelayLabel.BackgroundTransparency = 1
-    DelayLabel.Font = Enum.Font.Gotham
-    DelayLabel.TextSize = 11
-    DelayLabel.TextXAlignment = Enum.TextXAlignment.Left
-    DelayLabel.Parent = InputFrame
+    local HeightLabel = Instance.new("TextLabel")
+    HeightLabel.Size = UDim2.new(1, 0, 0, 15)
+    HeightLabel.Position = UDim2.new(0, 0, 0, 24)
+    HeightLabel.Text = "Height"
+    HeightLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    HeightLabel.BackgroundTransparency = 1
+    HeightLabel.Font = Enum.Font.Gotham
+    HeightLabel.TextSize = 9
+    HeightLabel.TextXAlignment = Enum.TextXAlignment.Center
+    HeightLabel.Parent = HeightCol
+
+    -- Delay Input (Column 2)
+    local DelayCol = Instance.new("Frame")
+    DelayCol.Size = UDim2.new(0.33, -2, 1, 0)
+    DelayCol.Position = UDim2.new(0.34, 0, 0, 0)
+    DelayCol.BackgroundTransparency = 1
+    DelayCol.Parent = InputRow
 
     local DelayBox = Instance.new("TextBox")
-    DelayBox.Size = UDim2.new(0.6, 0, 0, 20)
-    DelayBox.Position = UDim2.new(0.4, 0, 0, 25)
+    DelayBox.Size = UDim2.new(1, 0, 0, 22)
+    DelayBox.Position = UDim2.new(0, 0, 0, 0)
     DelayBox.Text = tostring(DEFAULT_DELAY)
-    DelayBox.PlaceholderText = "Sec"
-    DelayBox.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    DelayBox.PlaceholderText = "Delay"
+    DelayBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
     DelayBox.TextColor3 = Color3.new(1, 1, 1)
     DelayBox.Font = Enum.Font.Gotham
-    DelayBox.TextSize = 11
-    DelayBox.Parent = InputFrame
+    DelayBox.TextSize = 10
+    DelayBox.TextXAlignment = Enum.TextXAlignment.Center
+    DelayBox.Parent = DelayCol
 
     local DelayCorner = Instance.new("UICorner")
     DelayCorner.CornerRadius = UDim.new(0, 4)
     DelayCorner.Parent = DelayBox
 
-    -- LOCK SECTION: 3-row layout
-    local LockSection = Instance.new("Frame")
-    LockSection.Size = UDim2.new(1, 0, 0, 75)
-    LockSection.Position = UDim2.new(0, 0, 0, 50)
-    LockSection.BackgroundTransparency = 1
-    LockSection.Parent = InputFrame
+    local DelayLabel = Instance.new("TextLabel")
+    DelayLabel.Size = UDim2.new(1, 0, 0, 15)
+    DelayLabel.Position = UDim2.new(0, 0, 0, 24)
+    DelayLabel.Text = "Delay"
+    DelayLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    DelayLabel.BackgroundTransparency = 1
+    DelayLabel.Font = Enum.Font.Gotham
+    DelayLabel.TextSize = 9
+    DelayLabel.TextXAlignment = Enum.TextXAlignment.Center
+    DelayLabel.Parent = DelayCol
 
-    -- ROW 1: Lock Delay
+    -- Speed Input (Column 3)
+    local SpeedCol = Instance.new("Frame")
+    SpeedCol.Size = UDim2.new(0.33, -2, 1, 0)
+    SpeedCol.Position = UDim2.new(0.67, 0, 0, 0)
+    SpeedCol.BackgroundTransparency = 1
+    SpeedCol.Parent = InputRow
+
+    local SpeedBox = Instance.new("TextBox")
+    SpeedBox.Size = UDim2.new(1, 0, 0, 22)
+    SpeedBox.Position = UDim2.new(0, 0, 0, 0)
+    SpeedBox.Text = "500"
+    SpeedBox.PlaceholderText = "Speed"
+    SpeedBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    SpeedBox.TextColor3 = Color3.new(1, 1, 1)
+    SpeedBox.Font = Enum.Font.Gotham
+    SpeedBox.TextSize = 10
+    SpeedBox.TextXAlignment = Enum.TextXAlignment.Center
+    SpeedBox.Parent = SpeedCol
+
+    local SpeedCorner = Instance.new("UICorner")
+    SpeedCorner.CornerRadius = UDim.new(0, 4)
+    SpeedCorner.Parent = SpeedBox
+
+    local SpeedLabel = Instance.new("TextLabel")
+    SpeedLabel.Size = UDim2.new(1, 0, 0, 15)
+    SpeedLabel.Position = UDim2.new(0, 0, 0, 24)
+    SpeedLabel.Text = "Speed"
+    SpeedLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    SpeedLabel.BackgroundTransparency = 1
+    SpeedLabel.Font = Enum.Font.Gotham
+    SpeedLabel.TextSize = 9
+    SpeedLabel.TextXAlignment = Enum.TextXAlignment.Center
+    SpeedLabel.Parent = SpeedCol
+
+    -- LOCK SECTION: Only Lock Speed and Sync (Lock Delay REMOVED)
+    local LockSection = Instance.new("Frame")
+    LockSection.Size = UDim2.new(1, 0, 0, 45)
+    LockSection.Position = UDim2.new(0, 0, 0, 60)
+    LockSection.BackgroundTransparency = 1
+    LockSection.Parent = Content
+
+    -- ROW 1: Lock Speed
     local Row1 = Instance.new("Frame")
     Row1.Size = UDim2.new(1, 0, 0, 20)
     Row1.Position = UDim2.new(0, 0, 0, 0)
     Row1.BackgroundTransparency = 1
     Row1.Parent = LockSection
 
-    local LockDelayBox = Instance.new("TextButton")
-    LockDelayBox.Size = UDim2.new(0, 15, 0, 15)
-    LockDelayBox.Position = UDim2.new(0, 5, 0, 2)
-    LockDelayBox.Text = ""
-    LockDelayBox.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    LockDelayBox.Parent = Row1
-
-    local LockDelayCorner = Instance.new("UICorner")
-    LockDelayCorner.CornerRadius = UDim.new(0, 3)
-    LockDelayCorner.Parent = LockDelayBox
-
-    local LockDelayLabel = Instance.new("TextLabel")
-    LockDelayLabel.Size = UDim2.new(1, -25, 1, 0)
-    LockDelayLabel.Position = UDim2.new(0, 25, 0, 0)
-    LockDelayLabel.Text = "Lock Delay"
-    LockDelayLabel.TextColor3 = Color3.new(1, 1, 1)
-    LockDelayLabel.BackgroundTransparency = 1
-    LockDelayLabel.Font = Enum.Font.Gotham
-    LockDelayLabel.TextSize = 10
-    LockDelayLabel.TextXAlignment = Enum.TextXAlignment.Left
-    LockDelayLabel.Parent = Row1
-
-    -- ROW 2: Lock Speed
-    local Row2 = Instance.new("Frame")
-    Row2.Size = UDim2.new(1, 0, 0, 20)
-    Row2.Position = UDim2.new(0, 0, 0, 25)
-    Row2.BackgroundTransparency = 1
-    Row2.Parent = LockSection
-
     local LockSpeedBox = Instance.new("TextButton")
     LockSpeedBox.Size = UDim2.new(0, 15, 0, 15)
     LockSpeedBox.Position = UDim2.new(0, 5, 0, 2)
     LockSpeedBox.Text = ""
     LockSpeedBox.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    LockSpeedBox.Parent = Row2
+    LockSpeedBox.Parent = Row1
 
     local LockSpeedCorner = Instance.new("UICorner")
     LockSpeedCorner.CornerRadius = UDim.new(0, 3)
@@ -316,21 +333,21 @@ local function CreateGUI()
     LockSpeedLabel.Font = Enum.Font.Gotham
     LockSpeedLabel.TextSize = 10
     LockSpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-    LockSpeedLabel.Parent = Row2
+    LockSpeedLabel.Parent = Row1
 
-    -- ROW 3: Sync Delay = Win
-    local Row3 = Instance.new("Frame")
-    Row3.Size = UDim2.new(1, 0, 0, 20)
-    Row3.Position = UDim2.new(0, 0, 0, 50)
-    Row3.BackgroundTransparency = 1
-    Row3.Parent = LockSection
+    -- ROW 2: Sync Delay = Win
+    local Row2 = Instance.new("Frame")
+    Row2.Size = UDim2.new(1, 0, 0, 20)
+    Row2.Position = UDim2.new(0, 0, 0, 25)
+    Row2.BackgroundTransparency = 1
+    Row2.Parent = LockSection
 
     local SyncToggle = Instance.new("TextButton")
     SyncToggle.Size = UDim2.new(0, 15, 0, 15)
     SyncToggle.Position = UDim2.new(0, 5, 0, 2)
     SyncToggle.Text = ""
     SyncToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    SyncToggle.Parent = Row3
+    SyncToggle.Parent = Row2
 
     local SyncCorner = Instance.new("UICorner")
     SyncCorner.CornerRadius = UDim.new(0, 3)
@@ -345,41 +362,108 @@ local function CreateGUI()
     SyncLabel.Font = Enum.Font.Gotham
     SyncLabel.TextSize = 10
     SyncLabel.TextXAlignment = Enum.TextXAlignment.Left
-    SyncLabel.Parent = Row3
+    SyncLabel.Parent = Row2
 
-    -- CWT Status Indicator (moved down to avoid overlap)
-    local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Size = UDim2.new(1, 0, 0, 15)
-    StatusLabel.Position = UDim2.new(0, 0, 0, 130)  -- Moved from 85 to 130
-    StatusLabel.Text = "C[○] W[○] T[○]"
-    StatusLabel.TextColor3 = Color3.new(1, 1, 1)
-    StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Font = Enum.Font.GothamBold
-    StatusLabel.TextSize = 11
-    StatusLabel.TextXAlignment = Enum.TextXAlignment.Center
-    StatusLabel.Parent = Content
+    -- === CWT INDICATORS WITH GREEN/RED LIGHTS (50% smaller, left of text) ===
+    local CWTFrame = Instance.new("Frame")
+    CWTFrame.Size = UDim2.new(1, 0, 0, 25)
+    CWTFrame.Position = UDim2.new(0, 0, 0, 110)
+    CWTFrame.BackgroundTransparency = 1
+    CWTFrame.Parent = Content
 
-    -- Speed Indicator
-    local SpeedLabel = Instance.new("TextLabel")
-    SpeedLabel.Size = UDim2.new(1, 0, 0, 15)
-    SpeedLabel.Position = UDim2.new(0, 0, 0, 145)  -- Moved from 100 to 145
-    SpeedLabel.Text = "Speed: 0 studs/s"
-    SpeedLabel.TextColor3 = Color3.new(1, 1, 1)
-    SpeedLabel.BackgroundTransparency = 1
-    SpeedLabel.Font = Enum.Font.Gotham
-    SpeedLabel.TextSize = 11
-    SpeedLabel.TextXAlignment = Enum.TextXAlignment.Center
-    SpeedLabel.Parent = Content
+    -- Coin Indicator (light + label in one row)
+    local CoinIndicator = Instance.new("Frame")
+    CoinIndicator.Size = UDim2.new(0.33, -2, 1, 0)
+    CoinIndicator.Position = UDim2.new(0, 0, 0, 0)
+    CoinIndicator.BackgroundTransparency = 1
+    CoinIndicator.Parent = CWTFrame
+
+    local CoinLight = Instance.new("Frame")
+    CoinLight.Size = UDim2.new(0, 6, 0, 6)  -- 50% smaller (was 12x12)
+    CoinLight.Position = UDim2.new(0, 3, 0.5, -3)
+    CoinLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- RED default
+    CoinLight.Parent = CoinIndicator
+
+    local CoinLightCorner = Instance.new("UICorner")
+    CoinLightCorner.CornerRadius = UDim.new(0, 3)
+    CoinLightCorner.Parent = CoinLight
+
+    local CoinLabel = Instance.new("TextLabel")
+    CoinLabel.Size = UDim2.new(1, -10, 1, 0)
+    CoinLabel.Position = UDim2.new(0, 10, 0, 0)
+    CoinLabel.Text = "Coin"
+    CoinLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    CoinLabel.BackgroundTransparency = 1
+    CoinLabel.Font = Enum.Font.Gotham
+    CoinLabel.TextSize = 9
+    CoinLabel.TextXAlignment = Enum.TextXAlignment.Left
+    CoinLabel.Parent = CoinIndicator
+
+    -- Win Indicator (light + label in one row)
+    local WinIndicator = Instance.new("Frame")
+    WinIndicator.Size = UDim2.new(0.33, -2, 1, 0)
+    WinIndicator.Position = UDim2.new(0.34, 0, 0, 0)
+    WinIndicator.BackgroundTransparency = 1
+    WinIndicator.Parent = CWTFrame
+
+    local WinLight = Instance.new("Frame")
+    WinLight.Size = UDim2.new(0, 6, 0, 6)  -- 50% smaller (was 12x12)
+    WinLight.Position = UDim2.new(0, 3, 0.5, -3)
+    WinLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- RED default
+    WinLight.Parent = WinIndicator
+
+    local WinLightCorner = Instance.new("UICorner")
+    WinLightCorner.CornerRadius = UDim.new(0, 3)
+    WinLightCorner.Parent = WinLight
+
+    local WinLabel = Instance.new("TextLabel")
+    WinLabel.Size = UDim2.new(1, -10, 1, 0)
+    WinLabel.Position = UDim2.new(0, 10, 0, 0)
+    WinLabel.Text = "Win"
+    WinLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    WinLabel.BackgroundTransparency = 1
+    WinLabel.Font = Enum.Font.Gotham
+    WinLabel.TextSize = 9
+    WinLabel.TextXAlignment = Enum.TextXAlignment.Left
+    WinLabel.Parent = WinIndicator
+
+    -- Token Indicator (light + label in one row)
+    local TokenIndicator = Instance.new("Frame")
+    TokenIndicator.Size = UDim2.new(0.33, -2, 1, 0)
+    TokenIndicator.Position = UDim2.new(0.67, 0, 0, 0)
+    TokenIndicator.BackgroundTransparency = 1
+    TokenIndicator.Parent = CWTFrame
+
+    local TokenLight = Instance.new("Frame")
+    TokenLight.Size = UDim2.new(0, 6, 0, 6)  -- 50% smaller (was 12x12)
+    TokenLight.Position = UDim2.new(0, 3, 0.5, -3)
+    TokenLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- RED default
+    TokenLight.Parent = TokenIndicator
+
+    local TokenLightCorner = Instance.new("UICorner")
+    TokenLightCorner.CornerRadius = UDim.new(0, 3)
+    TokenLightCorner.Parent = TokenLight
+
+    local TokenLabel = Instance.new("TextLabel")
+    TokenLabel.Size = UDim2.new(1, -10, 1, 0)
+    TokenLabel.Position = UDim2.new(0, 10, 0, 0)
+    TokenLabel.Text = "Token"
+    TokenLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    TokenLabel.BackgroundTransparency = 1
+    TokenLabel.Font = Enum.Font.Gotham
+    TokenLabel.TextSize = 9
+    TokenLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TokenLabel.Parent = TokenIndicator
 
     -- Main Button
     local MainButton = Instance.new("TextButton")
-    MainButton.Size = UDim2.new(1, 0, 0, 30)
-    MainButton.Position = UDim2.new(0, 0, 0, 165)  -- Moved from 120 to 165
-    MainButton.Text = "START AUTO COIN"
+    MainButton.Size = UDim2.new(1, 0, 0, 28)
+    MainButton.Position = UDim2.new(0, 0, 0, 140)
+    MainButton.Text = "START"
     MainButton.Font = Enum.Font.GothamBold
     MainButton.TextSize = 12
     MainButton.TextColor3 = Color3.new(1, 1, 1)
-    MainButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    MainButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
     MainButton.Parent = Content
 
     local MainCorner = Instance.new("UICorner")
@@ -389,7 +473,7 @@ local function CreateGUI()
     -- Toggle Buttons Frame
     local ToggleFrame = Instance.new("Frame")
     ToggleFrame.Size = UDim2.new(1, 0, 0, 25)
-    ToggleFrame.Position = UDim2.new(0, 0, 0, 200)  -- Moved from 155 to 200
+    ToggleFrame.Position = UDim2.new(0, 0, 0, 173)
     ToggleFrame.BackgroundTransparency = 1
     ToggleFrame.Parent = Content
 
@@ -399,7 +483,7 @@ local function CreateGUI()
     WinButton.Position = UDim2.new(0, 0, 0, 0)
     WinButton.Text = "WIN: OFF"
     WinButton.Font = Enum.Font.Gotham
-    WinButton.TextSize = 11
+    WinButton.TextSize = 10
     WinButton.TextColor3 = Color3.new(1, 1, 1)
     WinButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
     WinButton.Parent = ToggleFrame
@@ -414,7 +498,7 @@ local function CreateGUI()
     TokenButton.Position = UDim2.new(0.52, 0, 0, 0)
     TokenButton.Text = "TOKEN: OFF"
     TokenButton.Font = Enum.Font.Gotham
-    TokenButton.TextSize = 11
+    TokenButton.TextSize = 10
     TokenButton.TextColor3 = Color3.new(1, 1, 1)
     TokenButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
     TokenButton.Parent = ToggleFrame
@@ -423,15 +507,15 @@ local function CreateGUI()
     TokenCorner.CornerRadius = UDim.new(0, 6)
     TokenCorner.Parent = TokenButton
 
-    -- Status Message (Loop Status with C, W, T)
+    -- Status Message
     local StatusMessage = Instance.new("TextLabel")
-    StatusMessage.Size = UDim2.new(1, 0, 0, 20)
-    StatusMessage.Position = UDim2.new(0, 0, 0, 230)  -- Moved from 185 to 230
+    StatusMessage.Size = UDim2.new(1, 0, 0, 18)
+    StatusMessage.Position = UDim2.new(0, 0, 0, 203)
     StatusMessage.Text = "JUMP FROM TOWER FIRST"
     StatusMessage.TextColor3 = Color3.fromRGB(255, 100, 100)
     StatusMessage.BackgroundTransparency = 1
     StatusMessage.Font = Enum.Font.GothamBold
-    StatusMessage.TextSize = 11
+    StatusMessage.TextSize = 10
     StatusMessage.TextXAlignment = Enum.TextXAlignment.Center
     StatusMessage.Parent = Content
 
@@ -440,22 +524,20 @@ local function CreateGUI()
         MainFrame = MainFrame,
         Frame = Frame,
         Content = Content,
-        HeightTextBox = HeightBox,
-        DelayTextBox = DelayBox,
-        StatusLabel = StatusLabel,
-        SpeedLabel = SpeedLabel,
+        HeightBox = HeightBox,
+        DelayBox = DelayBox,
+        SpeedBox = SpeedBox,
+        CoinLight = CoinLight,
+        WinLight = WinLight,
+        TokenLight = TokenLight,
         StartStopButton = MainButton,
         AutoWinToggle = WinButton,
         AutoTokenToggle = TokenButton,
         StatusMessage = StatusMessage,
         MinimizeButton = MinimizeButton,
         CloseButton = CloseButton,
-        LockDelayCheckbox = LockDelayBox,
-        LockDelayLabel = LockDelayLabel,
         LockSpeedCheckbox = LockSpeedBox,
-        LockSpeedLabel = LockSpeedLabel,
-        SyncToggle = SyncToggle,
-        SyncLabel = SyncLabel
+        SyncToggle = SyncToggle
     }
 end
 
@@ -467,7 +549,7 @@ end
 
 local function SendJumpData()
     if State.jumpID then
-        local height = tonumber(GUI.HeightTextBox.Text) or CalculateHeight()
+        local height = tonumber(GUI.HeightBox.Text) or CalculateHeight()
         SendRemoteEvent("JumpResults", State.jumpID, height)
     end
 end
@@ -494,23 +576,42 @@ local function SendTokenData()
 end
 
 ------ CORE LOGIC ------
-local function UpdateStatus()
-    local coinIcon = State.jumpID and State.landingID and "●" or "○"
-    local winIcon = State.winID and "●" or "○"
-    local tokenIcon = State.magicTokenID and "●" or "○"
+local function UpdateCWTIndicators()
+    -- Coin: GREEN if jumpID AND landingID exist, else RED
+    if State.jumpID and State.landingID then
+        GUI.CoinLight.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- GREEN
+    else
+        GUI.CoinLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- RED
+    end
 
-    GUI.StatusLabel.Text = string.format("C[%s] W[%s] T[%s]", coinIcon, winIcon, tokenIcon)
+    -- Win: GREEN if winID exists, else RED
+    if State.winID then
+        GUI.WinLight.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- GREEN
+    else
+        GUI.WinLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- RED
+    end
+
+    -- Token: GREEN if magicTokenID exists, else RED
+    if State.magicTokenID then
+        GUI.TokenLight.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- GREEN
+    else
+        GUI.TokenLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- RED
+    end
+end
+
+local function UpdateStatus()
+    UpdateCWTIndicators()
 
     if State.jumpID and State.landingID then
         State.isReady = true
-        GUI.StartStopButton.BackgroundColor3 = State.running and Color3.fromRGB(0, 200, 50) or Color3.fromRGB(70, 140, 80)
+        GUI.StartStopButton.BackgroundColor3 = State.running and Color3.fromRGB(0, 200, 50) or Color3.fromRGB(0, 150, 0)
         if not State.running then
             GUI.StatusMessage.Text = "READY TO START!"
             GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
         end
     else
         State.isReady = false
-        GUI.StartStopButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        GUI.StartStopButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
         GUI.StatusMessage.Text = "JUMP FROM TOWER FIRST"
         GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 100, 100)
     end
@@ -518,7 +619,7 @@ end
 
 local function UpdateStatusMessage(coinStatus, winStatus, tokenStatus)
     local statusText = ""
-    
+
     if coinStatus == "claimed" then
         statusText = statusText .. "C:✓ "
     elseif coinStatus == "waiting" then
@@ -528,7 +629,7 @@ local function UpdateStatusMessage(coinStatus, winStatus, tokenStatus)
     else
         statusText = statusText .. "C:○ "
     end
-    
+
     if winStatus == "claimed" then
         statusText = statusText .. "W:✓ "
     elseif winStatus == "waiting" then
@@ -538,7 +639,7 @@ local function UpdateStatusMessage(coinStatus, winStatus, tokenStatus)
     else
         statusText = statusText .. "W:○ "
     end
-    
+
     if tokenStatus == "claimed" then
         statusText = statusText .. "T:✓"
     elseif tokenStatus == "waiting" then
@@ -548,27 +649,27 @@ local function UpdateStatusMessage(coinStatus, winStatus, tokenStatus)
     else
         statusText = statusText .. "T:○"
     end
-    
+
     GUI.StatusMessage.Text = statusText
     GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
 end
 
 local function RunLoop()
     while State.running and State.hookEnabled do
-        local internalDelay = tonumber(GUI.DelayTextBox.Text) or DEFAULT_DELAY
+        local internalDelay = tonumber(GUI.DelayBox.Text) or DEFAULT_DELAY
 
-        -- Apply auto token delay formula when enabled (only if delay is not locked)
-        if State.autoTokenEnabled and not State.lockDelay then
+        -- Apply auto token delay formula when enabled
+        if State.autoTokenEnabled then
             local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
             if currentSpeed > 0 then
                 internalDelay = math.floor((10000 / currentSpeed) * 10) / 10
-                GUI.DelayTextBox.Text = string.format("%.1f", internalDelay)
+                GUI.DelayBox.Text = string.format("%.1f", internalDelay)
             end
         end
 
         State.lastLoopTime = os.time()
         State.nextLoopTime = State.lastLoopTime + internalDelay
-        
+
         UpdateStatusMessage("ready", "ready", "ready")
 
         -- Handle auto token at midpoint
@@ -577,11 +678,11 @@ local function RunLoop()
             while os.time() < tokenTime and State.running and State.hookEnabled do
                 local remaining = tokenTime - os.time()
                 local winRemaining = GetWinDelay() - (os.time() - State.lastWinTime)
-                
+
                 local coinStatus = string.format("%.1fs", remaining)
                 local winStatus = State.autoWinEnabled and string.format("%.1fs", winRemaining > 0 and winRemaining or 0) or "off"
                 local tokenStatus = string.format("%.1fs", remaining)
-                
+
                 GUI.StatusMessage.Text = string.format("C:%s W:%s T:%s", coinStatus, winStatus, tokenStatus)
                 GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 200, 100)
                 task.wait(0.1)
@@ -608,11 +709,11 @@ local function RunLoop()
         while os.time() < State.nextLoopTime and State.running and State.hookEnabled do
             local remaining = State.nextLoopTime - os.time()
             local winRemaining = currentWinDelay - (os.time() - State.lastWinTime)
-            
+
             local coinStatus = string.format("%.1fs", remaining)
             local winStatus = State.autoWinEnabled and string.format("%.1fs", winRemaining > 0 and winRemaining or 0) or "off"
             local tokenStatus = State.autoTokenEnabled and string.format("%.1fs", remaining) or "off"
-            
+
             GUI.StatusMessage.Text = string.format("C:%s W:%s T:%s", coinStatus, winStatus, tokenStatus)
             GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 200, 100)
             task.wait(0.1)
@@ -665,7 +766,7 @@ local function SetupCharacter(char)
 
                 if totalY > 0 and totalTime > 0 then
                     State.climbSpeed = totalY / totalTime
-                    GUI.SpeedLabel.Text = string.format("Speed: %.2f studs/s", State.climbSpeed)
+                    GUI.SpeedBox.Text = string.format("%.2f", State.climbSpeed)
 
                     if State.lockSpeed and State.lockedSpeed == 0 then
                         State.lockedSpeed = State.climbSpeed
@@ -679,15 +780,13 @@ local function SetupCharacter(char)
                         end
                     end
 
-                    if not State.lockDelay then
-                        UpdateHeight()
+                    UpdateHeight()
 
-                        if State.autoTokenEnabled then
-                            local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
-                            if currentSpeed > 0 then
-                                local newDelay = math.floor((10000 / currentSpeed) * 10) / 10
-                                GUI.DelayTextBox.Text = string.format("%.1f", newDelay)
-                            end
+                    if State.autoTokenEnabled then
+                        local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
+                        if currentSpeed > 0 then
+                            local newDelay = math.floor((10000 / currentSpeed) * 10) / 10
+                            GUI.DelayBox.Text = string.format("%.1f", newDelay)
                         end
                     end
 
@@ -735,13 +834,13 @@ local function InitializeEventHandlers()
         if State.isReady then
             State.running = not State.running
             if State.running then
-                GUI.StartStopButton.Text = "AUTO COIN ON"
-                GUI.StartStopButton.BackgroundColor3 = Color3.fromRGB(0, 200, 50)
+                GUI.StartStopButton.Text = "STOP"
+                GUI.StartStopButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
                 State.lastWinTime = os.time()
                 coroutine.wrap(RunLoop)()
             else
-                GUI.StartStopButton.Text = "START AUTO COIN"
-                GUI.StartStopButton.BackgroundColor3 = Color3.fromRGB(70, 140, 80)
+                GUI.StartStopButton.Text = "START"
+                GUI.StartStopButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
                 UpdateStatus()
             end
         end
@@ -780,12 +879,10 @@ local function InitializeEventHandlers()
             if State.autoTokenEnabled then
                 GUI.AutoTokenToggle.Text = "TOKEN: ON"
                 GUI.AutoTokenToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-                if not State.lockDelay then
-                    local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
-                    if currentSpeed > 0 then
-                        local newDelay = math.floor((10000 / currentSpeed) * 10) / 10
-                        GUI.DelayTextBox.Text = string.format("%.1f", newDelay)
-                    end
+                local currentSpeed = State.lockSpeed and State.lockedSpeed or State.climbSpeed
+                if currentSpeed > 0 then
+                    local newDelay = math.floor((10000 / currentSpeed) * 10) / 10
+                    GUI.DelayBox.Text = string.format("%.1f", newDelay)
                 end
             else
                 GUI.AutoTokenToggle.Text = "TOKEN: OFF"
@@ -815,36 +912,6 @@ local function InitializeEventHandlers()
             GUI.SyncToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
             GUI.StatusMessage.Text = "SYNC DISABLED"
             GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 100, 100)
-            task.wait(1.5)
-            if State.running then
-                UpdateStatusMessage("ready", "ready", "ready")
-            else
-                UpdateStatus()
-            end
-        end
-    end)
-
-    -- Lock Delay Checkbox
-    GUI.LockDelayCheckbox.MouseButton1Click:Connect(function()
-        State.lockDelay = not State.lockDelay
-        if State.lockDelay then
-            GUI.LockDelayCheckbox.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-            GUI.DelayTextBox.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-            GUI.DelayTextBox.TextEditable = false
-            GUI.StatusMessage.Text = "DELAY LOCKED"
-            GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-            task.wait(1.5)
-            if State.running then
-                UpdateStatusMessage("ready", "ready", "ready")
-            else
-                UpdateStatus()
-            end
-        else
-            GUI.LockDelayCheckbox.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-            GUI.DelayTextBox.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-            GUI.DelayTextBox.TextEditable = true
-            GUI.StatusMessage.Text = "DELAY UNLOCKED"
-            GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
             task.wait(1.5)
             if State.running then
                 UpdateStatusMessage("ready", "ready", "ready")
@@ -887,9 +954,9 @@ local function InitializeEventHandlers()
         end
     end)
 
-    -- Delay box change handler (only if not locked)
-    GUI.DelayTextBox:GetPropertyChangedSignal("Text"):Connect(function()
-        if State.climbSpeed > 0 and not State.lockDelay then
+    -- Delay box change handler
+    GUI.DelayBox:GetPropertyChangedSignal("Text"):Connect(function()
+        if State.climbSpeed > 0 then
             UpdateHeight()
         end
     end)
@@ -901,16 +968,10 @@ local function InitializeEventHandlers()
             GUI.Frame.Size = UDim2.new(0, 100, 0, 25)
             GUI.MinimizeButton.Text = "+"
             GUI.Content.Visible = false
-            GUI.StatusMessage.Visible = false
-            GUI.TitleText.Position = UDim2.new(0.5, -25, 0, 0)
-            GUI.TitleText.TextXAlignment = Enum.TextXAlignment.Center
         else
-            GUI.Frame.Size = UDim2.new(0, 200, 0, 275)
+            GUI.Frame.Size = UDim2.new(0, 200, 0, 290)
             GUI.MinimizeButton.Text = "-"
             GUI.Content.Visible = true
-            GUI.StatusMessage.Visible = true
-            GUI.TitleText.Position = UDim2.new(0.15, 0, 0, 0)
-            GUI.TitleText.TextXAlignment = Enum.TextXAlignment.Left
         end
     end)
 
@@ -972,4 +1033,4 @@ if LocalPlayer.Character then
 end
 LocalPlayer.CharacterAdded:Connect(SetupCharacter)
 
-print("Auto Coin V3 - Enhanced Version with Fixed CWT Position Loaded Successfully!")
+print("Auto Coin V3 - CWT Lights 50% Smaller & Left of Text - Loaded Successfully!")
