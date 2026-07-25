@@ -4,7 +4,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 -- Daftar URL skrip untuk dijalankan
 local scriptURLs = {
-    "https://raw.githubusercontent.com/upilbalmon/goblox/refs/heads/main/AUTO%20COIN%20V3.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/cajtv4.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/AutoFarm.lua",
     "https://raw.githubusercontent.com/upilbalmon/goblox/refs/heads/main/autohatchx10.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/eggidsaver.lua",
