@@ -86,7 +86,6 @@ function CAJTUI:CreateWindow(config)
 
     -- Shadow
     local shadow = Instance.new("UIShadow")
-    shadow.Size = 20
     shadow.Color = Color3.fromRGB(0, 0, 0)
     shadow.Parent = frame
 
