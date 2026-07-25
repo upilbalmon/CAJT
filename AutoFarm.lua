@@ -13,7 +13,114 @@ local drawCount = 10
 local autoDetect = true
 local hookEnabled = true
 local isMinimized = false
-local customAmount = 0 -- Nilai custom untuk jumlah hero (bisa negatif)
+local customAmount = 0
+local currentStep = 15
+local currentPangkat = 0
+
+--// Debounce variables
+local buttonCooldown = false
+local holdDelay = 0.3
+local holdInterval = 0.15
+
+-- ============================================
+-- PATTERN CALCULATOR
+-- ============================================
+local function hitungPattern(word)
+    word = string.lower(word)
+    local len = #word
+    if len < 2 then
+        return nil, "Minimal 2 huruf"
+    end
+
+    local firstChar = string.sub(word, 1, 1)
+    if not firstChar:match("%a") then
+        return nil, "Harus huruf a-z"
+    end
+
+    for c in word:gmatch(".") do
+        if c ~= firstChar or not c:match("%a") then
+            return nil, "Huruf harus sama semua (contoh: aaaaa)"
+        end
+    end
+
+    local i = string.byte(firstChar) - 97
+    local k = len
+    local n = 26 * (k - 2) + 1 + i
+    local exponent = 18 + 3 * n
+    return exponent, n
+end
+
+local function exponentToNumber(exponent)
+    return 10 ^ exponent
+end
+
+--// Fungsi untuk mengubah angka ke notasi ilmiah
+local function toScientificNotation(num)
+    if num == 0 then return "0" end
+    
+    local sign = ""
+    if num < 0 then
+        sign = "-"
+        num = math.abs(num)
+    end
+    
+    local exponent = math.floor(math.log10(num))
+    local mantissa = num / (10 ^ exponent)
+    
+    mantissa = math.floor(mantissa * 100 + 0.5) / 100
+    
+    if mantissa == 0 then
+        return "0"
+    elseif exponent == 0 then
+        return sign .. tostring(mantissa)
+    else
+        return sign .. string.format("%.2f", mantissa) .. "e+" .. tostring(exponent)
+    end
+end
+
+--// Fungsi untuk mendapatkan pattern dari exponent
+local function getPatternFromExponent(exponent)
+    if exponent < 21 then
+        return nil
+    end
+    
+    local n = (exponent - 18) / 3
+    if n < 1 then return nil end
+    
+    local k = math.floor((n - 1) / 26) + 2
+    local i = (n - 1) % 26
+    local char = string.char(97 + i)
+    
+    return string.rep(char, k)
+end
+
+--// Fungsi untuk display pattern dengan mantissa
+local function getPatternDisplay(num)
+    if num == 0 then return "0" end
+    
+    local sign = ""
+    local absNum = num
+    if num < 0 then
+        sign = "-"
+        absNum = math.abs(num)
+    end
+    
+    local exponent = math.floor(math.log10(absNum))
+    local mantissa = absNum / (10 ^ exponent)
+    mantissa = math.floor(mantissa * 100 + 0.5) / 100
+    
+    local pattern = getPatternFromExponent(exponent)
+    
+    if pattern then
+        if mantissa == 1 then
+            return sign .. pattern
+        else
+            return sign .. string.format("%.2f", mantissa) .. pattern
+        end
+    else
+        return toScientificNotation(num)
+    end
+end
 
 --// GUI
 local MainFrame = Instance.new("ScreenGui")
@@ -21,9 +128,10 @@ MainFrame.Name = "DrawHeroLoopGUI"
 MainFrame.Parent = playerGui
 MainFrame.ResetOnSpawn = false
 
+-- MAIN FRAME
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 380, 0, 200)
-Frame.Position = UDim2.new(0.5, -190, 0.5, -100)
+Frame.Size = UDim2.new(0, 420, 0, 350)
+Frame.Position = UDim2.new(0.5, -210, 0.5, -175)
 Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 Frame.BackgroundTransparency = 0.2
 Frame.Parent = MainFrame
@@ -34,9 +142,9 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 6)
 UICorner.Parent = Frame
 
--- Title Bar
+-- TITLE BAR
 local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 20)
+TitleBar.Size = UDim2.new(1, 0, 0, 25)
 TitleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 TitleBar.BackgroundTransparency = 0.3
 TitleBar.Parent = Frame
@@ -48,7 +156,7 @@ TitleBarCorner.Parent = TitleBar
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -70, 1, 0)
 Title.Position = UDim2.new(0, 5, 0, 0)
-Title.Text = "AUTO HATCH"
+Title.Text = "🧮 AUTO HATCH + PATTERN"
 Title.TextColor3 = Color3.fromRGB(220, 220, 220)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.SourceSans
@@ -56,10 +164,10 @@ Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TitleBar
 
--- Minimize Button
+-- MINIMIZE BUTTON
 local MinimizeButton = Instance.new("TextButton")
-MinimizeButton.Size = UDim2.new(0, 20, 0, 20)
-MinimizeButton.Position = UDim2.new(1, -45, 0, 0)
+MinimizeButton.Size = UDim2.new(0, 25, 0, 25)
+MinimizeButton.Position = UDim2.new(1, -50, 0, 0)
 MinimizeButton.Text = "−"
 MinimizeButton.Font = Enum.Font.SourceSans
 MinimizeButton.TextSize = 16
@@ -73,10 +181,10 @@ local MinimizeCorner = Instance.new("UICorner")
 MinimizeCorner.CornerRadius = UDim.new(0, 4)
 MinimizeCorner.Parent = MinimizeButton
 
--- Close Button
+-- CLOSE BUTTON
 local CloseButton = Instance.new("TextButton")
-CloseButton.Size = UDim2.new(0, 20, 0, 20)
-CloseButton.Position = UDim2.new(1, -22, 0, 0)
+CloseButton.Size = UDim2.new(0, 25, 0, 25)
+CloseButton.Position = UDim2.new(1, -25, 0, 0)
 CloseButton.Text = "✕"
 CloseButton.Font = Enum.Font.SourceSans
 CloseButton.TextSize = 14
@@ -90,43 +198,135 @@ local CloseButtonCorner = Instance.new("UICorner")
 CloseButtonCorner.CornerRadius = UDim.new(0, 4)
 CloseButtonCorner.Parent = CloseButton
 
--- Content Frame
+-- CONTENT FRAME
 local ContentFrame = Instance.new("Frame")
-ContentFrame.Size = UDim2.new(1, 0, 1, -20)
-ContentFrame.Position = UDim2.new(0, 0, 0, 20)
+ContentFrame.Size = UDim2.new(1, 0, 1, -25)
+ContentFrame.Position = UDim2.new(0, 0, 0, 25)
 ContentFrame.BackgroundTransparency = 1
 ContentFrame.Parent = Frame
+
+-- ============================================
+-- SECTION 1: PATTERN CALCULATOR
+-- ============================================
+local PatternFrame = Instance.new("Frame")
+PatternFrame.Size = UDim2.new(1, -10, 0, 85)
+PatternFrame.Position = UDim2.new(0, 5, 0, 5)
+PatternFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+PatternFrame.BackgroundTransparency = 0.3
+PatternFrame.BorderSizePixel = 0
+PatternFrame.Parent = ContentFrame
+
+local PatternCorner = Instance.new("UICorner")
+PatternCorner.CornerRadius = UDim.new(0, 4)
+PatternCorner.Parent = PatternFrame
+
+local PatternTitle = Instance.new("TextLabel")
+PatternTitle.Size = UDim2.new(1, 0, 0, 15)
+PatternTitle.Position = UDim2.new(0, 0, 0, 2)
+PatternTitle.BackgroundTransparency = 1
+PatternTitle.TextColor3 = Color3.fromRGB(180, 180, 200)
+PatternTitle.Font = Enum.Font.SourceSans
+PatternTitle.TextSize = 10
+PatternTitle.Text = "📐 PATTERN CALCULATOR → otomatis ke -Hero"
+PatternTitle.TextXAlignment = Enum.TextXAlignment.Center
+PatternTitle.Parent = PatternFrame
+
+local PatternInput = Instance.new("TextBox")
+PatternInput.Size = UDim2.new(0.7, -10, 0, 28)
+PatternInput.Position = UDim2.new(0, 5, 0, 20)
+PatternInput.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+PatternInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+PatternInput.Font = Enum.Font.SourceSans
+PatternInput.TextSize = 14
+PatternInput.PlaceholderText = "contoh: aaaaa"
+PatternInput.Text = ""
+PatternInput.ClearTextOnFocus = false
+PatternInput.Parent = PatternFrame
+
+local PatternInputCorner = Instance.new("UICorner")
+PatternInputCorner.CornerRadius = UDim.new(0, 4)
+PatternInputCorner.Parent = PatternInput
+
+local PatternButton = Instance.new("TextButton")
+PatternButton.Size = UDim2.new(0.25, -5, 0, 28)
+PatternButton.Position = UDim2.new(0.72, 0, 0, 20)
+PatternButton.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
+PatternButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+PatternButton.Font = Enum.Font.SourceSansBold
+PatternButton.TextSize = 12
+PatternButton.Text = "HITUNG → -Hero"
+PatternButton.Parent = PatternFrame
+
+local PatternButtonCorner = Instance.new("UICorner")
+PatternButtonCorner.CornerRadius = UDim.new(0, 4)
+PatternButtonCorner.Parent = PatternButton
+
+local PatternResult = Instance.new("TextLabel")
+PatternResult.Size = UDim2.new(1, -10, 0, 18)
+PatternResult.Position = UDim2.new(0, 5, 0, 55)
+PatternResult.BackgroundTransparency = 1
+PatternResult.TextColor3 = Color3.fromRGB(100, 255, 150)
+PatternResult.Font = Enum.Font.SourceSans
+PatternResult.TextSize = 12
+PatternResult.Text = ""
+PatternResult.TextXAlignment = Enum.TextXAlignment.Left
+PatternResult.Parent = PatternFrame
+
+local PatternStatus = Instance.new("TextLabel")
+PatternStatus.Size = UDim2.new(1, -10, 0, 14)
+PatternStatus.Position = UDim2.new(0, 5, 0, 73)
+PatternStatus.BackgroundTransparency = 1
+PatternStatus.TextColor3 = Color3.fromRGB(150, 150, 170)
+PatternStatus.Font = Enum.Font.SourceSans
+PatternStatus.TextSize = 9
+PatternStatus.Text = "Enter = Hitung & Masukkan ke -Hero"
+PatternStatus.TextXAlignment = Enum.TextXAlignment.Right
+PatternStatus.Parent = PatternFrame
+
+-- ============================================
+-- SECTION 2: AUTO FARM
+-- ============================================
+local AutoFarmFrame = Instance.new("Frame")
+AutoFarmFrame.Size = UDim2.new(1, -10, 0, 220)
+AutoFarmFrame.Position = UDim2.new(0, 5, 0, 100)
+AutoFarmFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+AutoFarmFrame.BackgroundTransparency = 0.3
+AutoFarmFrame.BorderSizePixel = 0
+AutoFarmFrame.Parent = ContentFrame
+
+local AutoFarmCorner = Instance.new("UICorner")
+AutoFarmCorner.CornerRadius = UDim.new(0, 4)
+AutoFarmCorner.Parent = AutoFarmFrame
 
 -- Status Label
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(1, -10, 0, 15)
-StatusLabel.Position = UDim2.new(0, 5, 1, -180)
+StatusLabel.Position = UDim2.new(0, 5, 0, 5)
 StatusLabel.Text = "Status: Siap..."
 StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Font = Enum.Font.SourceSans
 StatusLabel.TextSize = 11
 StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-StatusLabel.Parent = ContentFrame
+StatusLabel.Parent = AutoFarmFrame
 
 -- Draw Count Label
 local DrawLabel = Instance.new("TextLabel")
-DrawLabel.Size = UDim2.new(0.15, -5, 0, 18)
-DrawLabel.Position = UDim2.new(0, 5, 1, -160)
+DrawLabel.Size = UDim2.new(0.12, -5, 0, 18)
+DrawLabel.Position = UDim2.new(0, 5, 0, 23)
 DrawLabel.Text = "Draw:"
 DrawLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 DrawLabel.BackgroundTransparency = 1
 DrawLabel.Font = Enum.Font.SourceSans
 DrawLabel.TextSize = 11
 DrawLabel.TextXAlignment = Enum.TextXAlignment.Right
-DrawLabel.Parent = ContentFrame
+DrawLabel.Parent = AutoFarmFrame
 
--- Draw Count Buttons
 local DrawButtonFrame = Instance.new("Frame")
-DrawButtonFrame.Size = UDim2.new(0.5, -10, 0, 18)
-DrawButtonFrame.Position = UDim2.new(0.18, 0, 1, -160)
+DrawButtonFrame.Size = UDim2.new(0.6, -10, 0, 18)
+DrawButtonFrame.Position = UDim2.new(0.15, 0, 0, 23)
 DrawButtonFrame.BackgroundTransparency = 1
-DrawButtonFrame.Parent = ContentFrame
+DrawButtonFrame.Parent = AutoFarmFrame
 
 local Draw1Button = Instance.new("TextButton")
 Draw1Button.Size = UDim2.new(0.3, -3, 1, 0)
@@ -176,10 +376,9 @@ local Draw10Corner = Instance.new("UICorner")
 Draw10Corner.CornerRadius = UDim.new(0, 4)
 Draw10Corner.Parent = Draw10Button
 
--- Auto Detect Toggle
 local AutoDetectButton = Instance.new("TextButton")
 AutoDetectButton.Size = UDim2.new(0.18, -5, 0, 18)
-AutoDetectButton.Position = UDim2.new(0.7, 0, 1, -160)
+AutoDetectButton.Position = UDim2.new(0.78, 0, 0, 23)
 AutoDetectButton.Text = "Auto: ON"
 AutoDetectButton.Font = Enum.Font.SourceSans
 AutoDetectButton.TextSize = 10
@@ -187,7 +386,7 @@ AutoDetectButton.TextColor3 = Color3.fromRGB(220, 220, 220)
 AutoDetectButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
 AutoDetectButton.BackgroundTransparency = 0.3
 AutoDetectButton.BorderSizePixel = 0
-AutoDetectButton.Parent = ContentFrame
+AutoDetectButton.Parent = AutoFarmFrame
 
 local AutoDetectCorner = Instance.new("UICorner")
 AutoDetectCorner.CornerRadius = UDim.new(0, 4)
@@ -195,19 +394,19 @@ AutoDetectCorner.Parent = AutoDetectButton
 
 -- ID
 local IdLabel = Instance.new("TextLabel")
-IdLabel.Size = UDim2.new(0.12, -5, 0, 18)
-IdLabel.Position = UDim2.new(0, 5, 1, -138)
+IdLabel.Size = UDim2.new(0.1, -5, 0, 18)
+IdLabel.Position = UDim2.new(0, 5, 0, 44)
 IdLabel.Text = "ID:"
 IdLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 IdLabel.BackgroundTransparency = 1
 IdLabel.Font = Enum.Font.SourceSans
 IdLabel.TextSize = 11
 IdLabel.TextXAlignment = Enum.TextXAlignment.Right
-IdLabel.Parent = ContentFrame
+IdLabel.Parent = AutoFarmFrame
 
 local IdBox = Instance.new("TextBox")
-IdBox.Size = UDim2.new(0.35, -10, 0, 18)
-IdBox.Position = UDim2.new(0.15, 0, 1, -138)
+IdBox.Size = UDim2.new(0.25, -10, 0, 18)
+IdBox.Position = UDim2.new(0.13, 0, 0, 44)
 IdBox.Text = tostring(heroId)
 IdBox.PlaceholderText = "Hero ID"
 IdBox.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -215,15 +414,15 @@ IdBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 IdBox.BackgroundTransparency = 0.3
 IdBox.Font = Enum.Font.SourceSans
 IdBox.TextSize = 11
-IdBox.Parent = ContentFrame
+IdBox.Parent = AutoFarmFrame
 
 local IdBoxCorner = Instance.new("UICorner")
 IdBoxCorner.CornerRadius = UDim.new(0, 4)
 IdBoxCorner.Parent = IdBox
 
 local DetectNowButton = Instance.new("TextButton")
-DetectNowButton.Size = UDim2.new(0.2, -5, 0, 18)
-DetectNowButton.Position = UDim2.new(0.53, 0, 1, -138)
+DetectNowButton.Size = UDim2.new(0.15, -5, 0, 18)
+DetectNowButton.Position = UDim2.new(0.4, 0, 0, 44)
 DetectNowButton.Text = "Detect!"
 DetectNowButton.Font = Enum.Font.SourceSans
 DetectNowButton.TextSize = 11
@@ -231,27 +430,26 @@ DetectNowButton.TextColor3 = Color3.fromRGB(220, 220, 220)
 DetectNowButton.BackgroundColor3 = Color3.fromRGB(40, 80, 180)
 DetectNowButton.BackgroundTransparency = 0.3
 DetectNowButton.BorderSizePixel = 0
-DetectNowButton.Parent = ContentFrame
+DetectNowButton.Parent = AutoFarmFrame
 
 local DetectNowCorner = Instance.new("UICorner")
 DetectNowCorner.CornerRadius = UDim.new(0, 4)
 DetectNowCorner.Parent = DetectNowButton
 
--- Delay
 local DelayLabel = Instance.new("TextLabel")
-DelayLabel.Size = UDim2.new(0.12, -5, 0, 18)
-DelayLabel.Position = UDim2.new(0, 5, 1, -116)
+DelayLabel.Size = UDim2.new(0.1, -5, 0, 18)
+DelayLabel.Position = UDim2.new(0.57, 0, 0, 44)
 DelayLabel.Text = "Delay:"
 DelayLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 DelayLabel.BackgroundTransparency = 1
 DelayLabel.Font = Enum.Font.SourceSans
 DelayLabel.TextSize = 11
 DelayLabel.TextXAlignment = Enum.TextXAlignment.Right
-DelayLabel.Parent = ContentFrame
+DelayLabel.Parent = AutoFarmFrame
 
 local DelayBox = Instance.new("TextBox")
-DelayBox.Size = UDim2.new(0.2, -10, 0, 18)
-DelayBox.Position = UDim2.new(0.15, 0, 1, -116)
+DelayBox.Size = UDim2.new(0.12, -5, 0, 18)
+DelayBox.Position = UDim2.new(0.67, 0, 0, 44)
 DelayBox.Text = tostring(delayTime)
 DelayBox.PlaceholderText = "Delay"
 DelayBox.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -259,15 +457,15 @@ DelayBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 DelayBox.BackgroundTransparency = 0.3
 DelayBox.Font = Enum.Font.SourceSans
 DelayBox.TextSize = 11
-DelayBox.Parent = ContentFrame
+DelayBox.Parent = AutoFarmFrame
 
 local DelayBoxCorner = Instance.new("UICorner")
 DelayBoxCorner.CornerRadius = UDim.new(0, 4)
 DelayBoxCorner.Parent = DelayBox
 
 local StartStopButton = Instance.new("TextButton")
-StartStopButton.Size = UDim2.new(0.45, -10, 0, 18)
-StartStopButton.Position = UDim2.new(0.38, 0, 1, -116)
+StartStopButton.Size = UDim2.new(0.2, -5, 0, 18)
+StartStopButton.Position = UDim2.new(0.8, 0, 0, 44)
 StartStopButton.Text = "Start"
 StartStopButton.Font = Enum.Font.SourceSans
 StartStopButton.TextSize = 11
@@ -275,62 +473,61 @@ StartStopButton.TextColor3 = Color3.fromRGB(220, 220, 220)
 StartStopButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 StartStopButton.BackgroundTransparency = 0.3
 StartStopButton.BorderSizePixel = 0
-StartStopButton.Parent = ContentFrame
+StartStopButton.Parent = AutoFarmFrame
 
 local StartStopCorner = Instance.new("UICorner")
 StartStopCorner.CornerRadius = UDim.new(0, 4)
 StartStopCorner.Parent = StartStopButton
 
--- ID Detected Label
 local IdDetectedLabel = Instance.new("TextLabel")
 IdDetectedLabel.Size = UDim2.new(1, -10, 0, 15)
-IdDetectedLabel.Position = UDim2.new(0, 5, 1, -96)
+IdDetectedLabel.Position = UDim2.new(0, 5, 0, 65)
 IdDetectedLabel.Text = "ID Terdeteksi: -"
 IdDetectedLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
 IdDetectedLabel.BackgroundTransparency = 1
 IdDetectedLabel.Font = Enum.Font.SourceSans
 IdDetectedLabel.TextSize = 11
 IdDetectedLabel.TextXAlignment = Enum.TextXAlignment.Left
-IdDetectedLabel.Parent = ContentFrame
+IdDetectedLabel.Parent = AutoFarmFrame
 
--- Draw Count Display
 local DrawCountDisplay = Instance.new("TextLabel")
 DrawCountDisplay.Size = UDim2.new(1, -10, 0, 15)
-DrawCountDisplay.Position = UDim2.new(0, 5, 1, -78)
+DrawCountDisplay.Position = UDim2.new(0, 5, 0, 82)
 DrawCountDisplay.Text = "Draw: 10x"
 DrawCountDisplay.TextColor3 = Color3.fromRGB(100, 200, 100)
 DrawCountDisplay.BackgroundTransparency = 1
 DrawCountDisplay.Font = Enum.Font.SourceSans
 DrawCountDisplay.TextSize = 11
 DrawCountDisplay.TextXAlignment = Enum.TextXAlignment.Center
-DrawCountDisplay.Parent = ContentFrame
+DrawCountDisplay.Parent = AutoFarmFrame
 
--- === FITUR CUSTOM JUMLAH HERO (NEGATIF) ===
+-- ============================================
+-- CUSTOM HERO dengan Step Control
+-- ============================================
 local CustomLabel = Instance.new("TextLabel")
-CustomLabel.Size = UDim2.new(0.15, -5, 0, 18)
-CustomLabel.Position = UDim2.new(0, 5, 1, -56)
+CustomLabel.Size = UDim2.new(0.12, -5, 0, 18)
+CustomLabel.Position = UDim2.new(0, 5, 0, 100)
 CustomLabel.Text = "-Hero:"
-CustomLabel.TextColor3 = Color3.fromRGB(255, 100, 100) -- Warna merah untuk negatif
+CustomLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
 CustomLabel.BackgroundTransparency = 1
 CustomLabel.Font = Enum.Font.SourceSans
 CustomLabel.TextSize = 11
 CustomLabel.TextXAlignment = Enum.TextXAlignment.Right
-CustomLabel.Parent = ContentFrame
+CustomLabel.Parent = AutoFarmFrame
 
--- Frame untuk custom amount
 local CustomFrame = Instance.new("Frame")
-CustomFrame.Size = UDim2.new(0.65, -10, 0, 24)
-CustomFrame.Position = UDim2.new(0.18, 0, 1, -58)
+CustomFrame.Size = UDim2.new(0.82, -10, 0, 28)
+CustomFrame.Position = UDim2.new(0.15, 0, 0, 98)
 CustomFrame.BackgroundTransparency = 1
-CustomFrame.Parent = ContentFrame
+CustomFrame.Parent = AutoFarmFrame
 
--- TextBox untuk input custom (otomatis negatif)
+-- CustomBox utama
 local CustomBox = Instance.new("TextBox")
 CustomBox.Size = UDim2.new(0.55, -5, 1, 0)
 CustomBox.Position = UDim2.new(0, 0, 0, 0)
 CustomBox.Text = "0"
-CustomBox.PlaceholderText = "Jumlah Hero (-)"
-CustomBox.TextColor3 = Color3.fromRGB(255, 150, 150) -- Warna merah
+CustomBox.PlaceholderText = "Jumlah Hero (+/-)"
+CustomBox.TextColor3 = Color3.fromRGB(255, 150, 150)
 CustomBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 CustomBox.BackgroundTransparency = 0.3
 CustomBox.Font = Enum.Font.SourceSans
@@ -341,30 +538,13 @@ local CustomBoxCorner = Instance.new("UICorner")
 CustomBoxCorner.CornerRadius = UDim.new(0, 4)
 CustomBoxCorner.Parent = CustomBox
 
--- Tombol Up (menambah nilai negatif, contoh: -1 -> -2)
-local UpButton = Instance.new("TextButton")
-UpButton.Size = UDim2.new(0.07, 0, 0.5, 0)
-UpButton.Position = UDim2.new(0.57, 0, 0, 0)
-UpButton.Text = "▲"
-UpButton.Font = Enum.Font.SourceSans
-UpButton.TextSize = 10
-UpButton.TextColor3 = Color3.fromRGB(220, 220, 220)
-UpButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
-UpButton.BackgroundTransparency = 0.3
-UpButton.BorderSizePixel = 0
-UpButton.Parent = CustomFrame
-
-local UpCorner = Instance.new("UICorner")
-UpCorner.CornerRadius = UDim.new(0, 3)
-UpCorner.Parent = UpButton
-
--- Tombol Down (mengurangi nilai negatif, contoh: -1 -> 0)
+-- Tombol ▼ (Down)
 local DownButton = Instance.new("TextButton")
-DownButton.Size = UDim2.new(0.07, 0, 0.5, 0)
-DownButton.Position = UDim2.new(0.57, 0, 0.5, 0)
+DownButton.Size = UDim2.new(0.07, 0, 1, 0)
+DownButton.Position = UDim2.new(0.57, 0, 0, 0)
 DownButton.Text = "▼"
 DownButton.Font = Enum.Font.SourceSans
-DownButton.TextSize = 10
+DownButton.TextSize = 14
 DownButton.TextColor3 = Color3.fromRGB(220, 220, 220)
 DownButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
 DownButton.BackgroundTransparency = 0.3
@@ -372,45 +552,106 @@ DownButton.BorderSizePixel = 0
 DownButton.Parent = CustomFrame
 
 local DownCorner = Instance.new("UICorner")
-DownCorner.CornerRadius = UDim.new(0, 3)
+DownCorner.CornerRadius = UDim.new(0, 4)
 DownCorner.Parent = DownButton
 
--- Tombol Kelipatan NEGATIF (1K-, 1M-, 1T-, 1B-)
-local MultiplierFrame = Instance.new("Frame")
-MultiplierFrame.Size = UDim2.new(0.3, -5, 0.8, 0)
-MultiplierFrame.Position = UDim2.new(0.66, 0, 0.1, 0)
-MultiplierFrame.BackgroundTransparency = 1
-MultiplierFrame.Parent = CustomFrame
+-- Tombol ▲ (Up)
+local UpButton = Instance.new("TextButton")
+UpButton.Size = UDim2.new(0.07, 0, 1, 0)
+UpButton.Position = UDim2.new(0.65, 0, 0, 0)
+UpButton.Text = "▲"
+UpButton.Font = Enum.Font.SourceSans
+UpButton.TextSize = 14
+UpButton.TextColor3 = Color3.fromRGB(220, 220, 220)
+UpButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+UpButton.BackgroundTransparency = 0.3
+UpButton.BorderSizePixel = 0
+UpButton.Parent = CustomFrame
 
-local MultiplierButtons = {}
-local multipliers = {
-    {name = "1K-", value = -1000},
-    {name = "1M-", value = -1000000},
-    {name = "1T-", value = -1000000000},
-    {name = "1B-", value = -1000000000000}
-}
+local UpCorner = Instance.new("UICorner")
+UpCorner.CornerRadius = UDim.new(0, 4)
+UpCorner.Parent = UpButton
 
-for i, mult in ipairs(multipliers) do
+-- Dropdown Step
+local StepLabel = Instance.new("TextLabel")
+StepLabel.Size = UDim2.new(0.12, -5, 1, 0)
+StepLabel.Position = UDim2.new(0.74, 0, 0, 0)
+StepLabel.Text = "Step:"
+StepLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+StepLabel.BackgroundTransparency = 1
+StepLabel.Font = Enum.Font.SourceSans
+StepLabel.TextSize = 10
+StepLabel.TextXAlignment = Enum.TextXAlignment.Right
+StepLabel.Parent = CustomFrame
+
+local StepDropdown = Instance.new("TextButton")
+StepDropdown.Size = UDim2.new(0.12, -5, 1, 0)
+StepDropdown.Position = UDim2.new(0.88, 0, 0, 0)
+StepDropdown.Text = "15"
+StepDropdown.Font = Enum.Font.SourceSans
+StepDropdown.TextSize = 11
+StepDropdown.TextColor3 = Color3.fromRGB(220, 220, 220)
+StepDropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+StepDropdown.BackgroundTransparency = 0.3
+StepDropdown.BorderSizePixel = 0
+StepDropdown.Parent = CustomFrame
+
+local StepCorner = Instance.new("UICorner")
+StepCorner.CornerRadius = UDim.new(0, 4)
+StepCorner.Parent = StepDropdown
+
+-- Dropdown List (popup) - DIPERLAMBAR untuk step 1,2,3
+local DropdownList = Instance.new("Frame")
+DropdownList.Size = UDim2.new(0.12, -5, 0, 180) -- Diperbesar untuk 12 item
+DropdownList.Position = UDim2.new(0.88, 0, 1, 0)
+DropdownList.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+DropdownList.BackgroundTransparency = 0.3
+DropdownList.BorderSizePixel = 1
+DropdownList.BorderColor3 = Color3.fromRGB(60, 60, 70)
+DropdownList.Visible = false
+DropdownList.Parent = CustomFrame
+
+local DropdownCorner = Instance.new("UICorner")
+DropdownCorner.CornerRadius = UDim.new(0, 4)
+DropdownCorner.Parent = DropdownList
+
+-- Isi dropdown dengan step 1,2,3 dan kelipatan 3
+local stepOptions = {1, 2, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30}
+local stepButtons = {}
+
+for i, step in ipairs(stepOptions) do
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.23, -2, 1, 0)
-    btn.Position = UDim2.new((i-1) * 0.25, 0, 0, 0)
-    btn.Text = mult.name
+    btn.Size = UDim2.new(1, 0, 0, 15)
+    btn.Position = UDim2.new(0, 0, 0, (i-1) * 15)
+    btn.Text = tostring(step)
     btn.Font = Enum.Font.SourceSans
-    btn.TextSize = 9
-    btn.TextColor3 = Color3.fromRGB(255, 150, 150) -- Warna merah
+    btn.TextSize = 11
+    btn.TextColor3 = Color3.fromRGB(220, 220, 220)
     btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     btn.BackgroundTransparency = 0.3
     btn.BorderSizePixel = 0
-    btn.Parent = MultiplierFrame
+    btn.Parent = DropdownList
     
     local btnCorner = Instance.new("UICorner")
     btnCorner.CornerRadius = UDim.new(0, 3)
     btnCorner.Parent = btn
     
-    MultiplierButtons[mult.name] = btn
+    stepButtons[step] = btn
 end
 
--- Mini Button
+-- Display Notasi Ilmiah + Pattern
+local DisplayLabel = Instance.new("TextLabel")
+DisplayLabel.Size = UDim2.new(1, -10, 0, 18)
+DisplayLabel.Position = UDim2.new(0, 5, 0, 130)
+DisplayLabel.Text = "Display: 0"
+DisplayLabel.TextColor3 = Color3.fromRGB(100, 255, 150)
+DisplayLabel.BackgroundTransparency = 1
+DisplayLabel.Font = Enum.Font.SourceSans
+DisplayLabel.TextSize = 11
+DisplayLabel.TextXAlignment = Enum.TextXAlignment.Left
+DisplayLabel.Parent = AutoFarmFrame
+
+-- MINI BUTTON
 local MiniButton = Instance.new("TextButton")
 MiniButton.Size = UDim2.new(0, 40, 0, 40)
 MiniButton.Position = UDim2.new(1, -50, 1, -50)
@@ -436,7 +677,7 @@ local oldNamecall = nil
 local function FormatNumber(num)
     local absNum = math.abs(num)
     local sign = num < 0 and "-" or ""
-    
+
     if absNum >= 1000000000000 then
         return sign .. string.format("%.2fB", absNum/1000000000000)
     elseif absNum >= 1000000000 then
@@ -450,49 +691,105 @@ local function FormatNumber(num)
     end
 end
 
---// Fungsi untuk update custom amount (selalu negatif)
+--// Fungsi untuk mendapatkan mantissa dan exponent dari angka
+local function getMantissaAndExponent(num)
+    if num == 0 then return 0, 0 end
+    
+    local absNum = math.abs(num)
+    local exponent = math.floor(math.log10(absNum))
+    local mantissa = absNum / (10 ^ exponent)
+    mantissa = math.floor(mantissa * 100 + 0.5) / 100
+    
+    return mantissa, exponent
+end
+
+--// Fungsi untuk update custom amount
 local function UpdateCustomAmount(value)
-    -- Pastikan nilai selalu negatif atau 0
-    local newValue = math.min(0, value) -- Hanya 0 atau negatif
-    newValue = math.max(-999999999999, newValue) -- Batas minimum
-    customAmount = newValue
+    customAmount = value
     CustomBox.Text = tostring(customAmount)
     
-    -- Update status
+    if customAmount ~= 0 then
+        local _, exp = getMantissaAndExponent(customAmount)
+        currentPangkat = exp
+    else
+        currentPangkat = 0
+    end
+    
+    if customAmount == 0 then
+        DisplayLabel.Text = "Display: 0"
+        DisplayLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    elseif customAmount < 0 then
+        local displayText = getPatternDisplay(customAmount)
+        DisplayLabel.Text = "Display: " .. displayText .. "  (" .. toScientificNotation(customAmount) .. ")"
+        DisplayLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    else
+        customAmount = 0
+        CustomBox.Text = "0"
+        DisplayLabel.Text = "Display: 0 (hanya negatif/0)"
+        DisplayLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+    end
+    
     if customAmount < 0 then
         StatusLabel.Text = "📊 Custom: " .. FormatNumber(customAmount)
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100) -- Warna merah
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
     elseif customAmount == 0 then
         StatusLabel.Text = "📊 Custom: 0 (menggunakan Draw)"
         StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     end
 end
 
---// Event untuk Custom Box
-CustomBox.FocusLost:Connect(function(enterPressed)
-    local value = tonumber(CustomBox.Text)
-    if value ~= nil then
-        -- Pastikan negatif
-        UpdateCustomAmount(value)
-    else
-        CustomBox.Text = tostring(customAmount)
+--// Fungsi untuk mengubah pangkat dengan step (dengan debounce)
+local function ChangePangkat(direction)
+    if buttonCooldown then return end
+    buttonCooldown = true
+    
+    if customAmount == 0 then
+        if direction == 1 then
+            UpdateCustomAmount(- (10 ^ currentStep))
+            currentPangkat = currentStep
+        end
+        buttonCooldown = false
+        return
     end
-end)
+    
+    if customAmount >= 0 then
+        UpdateCustomAmount(0)
+        buttonCooldown = false        return
+    end
+    
+    local mantissa, exponent = getMantissaAndExponent(customAmount)
+    local newExponent = exponent + (direction * currentStep)
+    
+    if newExponent < 6 then
+        newExponent = 6
+    end
+    
+    local newValue = - (mantissa * (10 ^ newExponent))
+    UpdateCustomAmount(newValue)
+    
+    task.wait(0.1)
+    buttonCooldown = false
+end
 
---// Event untuk Up Button (nilai semakin negatif)
+--// Event untuk Up Button (▲)
 local upHold = false
 local upCoroutine = nil
+local upHoldStarted = false
 
 UpButton.MouseButton1Down:Connect(function()
+    if upHold then return end
     upHold = true
-    UpdateCustomAmount(customAmount - 1) -- Kurangi 1 (lebih negatif)
+    upHoldStarted = false
+    
+    ChangePangkat(1)
     
     upCoroutine = coroutine.wrap(function()
+        task.wait(holdDelay)
+        upHoldStarted = true
+        
         while upHold do
-            task.wait(0.1)
-            if upHold then
-                UpdateCustomAmount(customAmount - 1)
-            end
+            ChangePangkat(1)
+            task.wait(holdInterval)
         end
     end)
     upCoroutine()
@@ -500,26 +797,41 @@ end)
 
 UpButton.MouseButton1Up:Connect(function()
     upHold = false
+    upHoldStarted = false
 end)
 
 UpButton.MouseLeave:Connect(function()
     upHold = false
+    upHoldStarted = false
 end)
 
---// Event untuk Down Button (nilai mendekati 0)
+UpButton.MouseEnter:Connect(function()
+    UpButton.BackgroundColor3 = Color3.fromRGB(60, 220, 60)
+end)
+
+UpButton.MouseLeave:Connect(function()
+    UpButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+end)
+
+--// Event untuk Down Button (▼)
 local downHold = false
 local downCoroutine = nil
+local downHoldStarted = false
 
 DownButton.MouseButton1Down:Connect(function()
+    if downHold then return end
     downHold = true
-    UpdateCustomAmount(customAmount + 1) -- Tambah 1 (mendekati 0)
+    downHoldStarted = false
+    
+    ChangePangkat(-1)
     
     downCoroutine = coroutine.wrap(function()
+        task.wait(holdDelay)
+        downHoldStarted = true
+        
         while downHold do
-            task.wait(0.1)
-            if downHold then
-                UpdateCustomAmount(customAmount + 1)
-            end
+            ChangePangkat(-1)
+            task.wait(holdInterval)
         end
     end)
     downCoroutine()
@@ -527,23 +839,45 @@ end)
 
 DownButton.MouseButton1Up:Connect(function()
     downHold = false
+    downHoldStarted = false
 end)
 
 DownButton.MouseLeave:Connect(function()
     downHold = false
+    downHoldStarted = false
 end)
 
---// Event untuk Multiplier Buttons (semua negatif)
-for name, btn in pairs(MultiplierButtons) do
+DownButton.MouseEnter:Connect(function()
+    DownButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+end)
+
+DownButton.MouseLeave:Connect(function()
+    DownButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+end)
+
+--// Event untuk Dropdown
+StepDropdown.MouseButton1Click:Connect(function()
+    DropdownList.Visible = not DropdownList.Visible
+end)
+
+for step, btn in pairs(stepButtons) do
     btn.MouseButton1Click:Connect(function()
-        local multValue = 0
-        if name == "1K-" then multValue = -1000
-        elseif name == "1M-" then multValue = -1000000
-        elseif name == "1T-" then multValue = -1000000000
-        elseif name == "1B-" then multValue = -1000000000000
-        end
+        currentStep = step
+        StepDropdown.Text = tostring(step)
+        DropdownList.Visible = false
         
-        UpdateCustomAmount(customAmount + multValue) -- Tambahkan nilai negatif
+        for s, b in pairs(stepButtons) do
+            b.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        end
+        btn.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+        
+        if customAmount ~= 0 then
+            local mantissa, exponent = getMantissaAndExponent(customAmount)
+            local newExponent = math.floor(exponent / step) * step
+            if newExponent < 6 then newExponent = step end
+            local newValue = - (mantissa * (10 ^ newExponent))
+            UpdateCustomAmount(newValue)
+        end
     end)
     
     btn.MouseEnter:Connect(function()
@@ -551,9 +885,107 @@ for name, btn in pairs(MultiplierButtons) do
     end)
     
     btn.MouseLeave:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        if tonumber(btn.Text) ~= currentStep then
+            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        end
     end)
 end
+
+-- Sembunyikan dropdown saat klik di luar
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+        local dropdownPos = DropdownList.AbsolutePosition
+        local dropdownSize = DropdownList.AbsoluteSize
+        
+        if not (mousePos.X >= dropdownPos.X and mousePos.X <= dropdownPos.X + dropdownSize.X and
+                mousePos.Y >= dropdownPos.Y and mousePos.Y <= dropdownPos.Y + dropdownSize.Y) then
+            DropdownList.Visible = false
+        end
+    end
+end)
+
+--// Fungsi Pattern Calculator
+local function updatePatternResult(text, isSuccess, exponentValue)
+    if isSuccess then
+        PatternResult.Text = text
+        PatternResult.TextColor3 = Color3.fromRGB(100, 255, 100)
+        PatternStatus.Text = "✅ " .. text .. " → dimasukkan ke -Hero"
+        PatternStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
+        
+        if exponentValue then
+            local adjustedExponent = math.floor(exponentValue / currentStep) * currentStep
+            if adjustedExponent < 6 then adjustedExponent = currentStep end
+            
+            local negativeValue = -exponentToNumber(adjustedExponent)
+            UpdateCustomAmount(negativeValue)
+            StatusLabel.Text = "📊 Pattern → -Hero: " .. FormatNumber(negativeValue) .. " (step " .. currentStep .. ")"
+            StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
+    else
+        PatternResult.Text = "⚠️ " .. text
+        PatternResult.TextColor3 = Color3.fromRGB(255, 100, 100)
+        PatternStatus.Text = "❌ " .. text
+        PatternStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end
+
+local function clearPattern()
+    PatternInput.Text = ""
+    PatternResult.Text = ""
+    PatternResult.TextColor3 = Color3.fromRGB(100, 255, 150)
+    PatternStatus.Text = "Enter = Hitung & Masukkan ke -Hero"
+    PatternStatus.TextColor3 = Color3.fromRGB(150, 150, 170)
+end
+
+local function hitungPatternFromInput()
+    local text = PatternInput.Text
+    if text == "" then
+        updatePatternResult("Masukkan huruf!", false)
+        return
+    end
+
+    local exponent, nOrErr = hitungPattern(text)
+    if exponent then
+        updatePatternResult(string.format("1e+%d  (n=%d)", exponent, nOrErr), true, exponent)
+    else
+        updatePatternResult(nOrErr, false)
+    end
+end
+
+--// Event Pattern Calculator
+PatternButton.MouseButton1Click:Connect(hitungPatternFromInput)
+
+PatternInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        hitungPatternFromInput()
+    end
+end)
+
+PatternInput.Focused:Connect(function()
+    if PatternInput.Text == "" then
+        PatternInput.PlaceholderText = "contoh: aaaaa"
+    end
+end)
+
+PatternInput.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        clearPattern()
+    end
+end)
+
+--// Event untuk Custom Box
+CustomBox.FocusLost:Connect(function(enterPressed)
+    local value = tonumber(CustomBox.Text)
+    if value ~= nil then
+        if value > 0 then
+            value = 0
+        end
+        UpdateCustomAmount(value)
+    else
+        CustomBox.Text = tostring(customAmount)
+    end
+end)
 
 --// Function to update draw button states
 local function UpdateDrawButtons(selected)
@@ -740,7 +1172,6 @@ local function DrawHeroFunction()
         return
     end
 
-    -- Gunakan customAmount jika tidak 0 (negatif), selain itu gunakan drawCount
     local amountToDraw = drawCount
     if customAmount ~= 0 then
         amountToDraw = customAmount
@@ -774,7 +1205,7 @@ StartStopButton.MouseButton1Click:Connect(function()
         StartStopButton.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
         coroutineLoop = coroutine.wrap(RunLoop)
         coroutineLoop()
-        
+
         local amountDisplay = drawCount .. "x"
         if customAmount ~= 0 then
             amountDisplay = FormatNumber(customAmount)
@@ -787,7 +1218,7 @@ StartStopButton.MouseButton1Click:Connect(function()
     end
 end)
 
---// Minimize function
+--// MINIMIZE FUNCTION
 local function MinimizeGUI()
     isMinimized = true
     TweenService:Create(Frame, TweenInfo.new(0.3), {
@@ -804,15 +1235,17 @@ local function RestoreGUI()
     MiniButton.Visible = false
     Frame.Visible = true
     TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 380, 0, 200),
-        Position = UDim2.new(0.5, -190, 0.5, -100)
+        Size = UDim2.new(0, 420, 0, 350),
+        Position = UDim2.new(0.5, -210, 0.5, -175)
     }):Play()
 end
 
+-- EVENT MINIMIZE
 MinimizeButton.MouseButton1Click:Connect(function()
     MinimizeGUI()
 end)
 
+-- EVENT MINI BUTTON
 MiniButton.MouseButton1Click:Connect(function()
     RestoreGUI()
 end)
@@ -833,7 +1266,7 @@ CloseButton.MouseButton1Click:Connect(function()
     MainFrame:Destroy()
 end)
 
--- Close button hover
+-- HOVER EFFECTS
 CloseButton.MouseEnter:Connect(function()
     CloseButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
 end)
@@ -899,6 +1332,14 @@ else
     UpdateStatus("⚠️ Auto detect gagal. Gunakan ID manual.", Color3.fromRGB(255, 165, 0))
 end
 
-print("🚀 Auto Hatch Script Loaded")
+-- Set default step highlight
+for s, btn in pairs(stepButtons) do
+    if s == currentStep then
+        btn.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+    end
+end
+
+print("🚀 Auto Hatch + Pattern Script Loaded")
 print("📌 Default ID: " .. heroId)
 print("📌 Default Draw: " .. drawCount .. "x")
+print("📌 Default Step: " .. currentStep)
