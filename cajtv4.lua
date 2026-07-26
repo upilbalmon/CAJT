@@ -2,6 +2,7 @@
     AUTO COIN V4 - Compact Version with Real-time Cooldown Status
     Fitur: Height (auto), Delay (manual), Speed | Lock Speed | Sync Delay | Mode Farming
     Sync Delay: Menyamakan delay dan membuat loop berjalan bareng
+    MODIFIKASI: Progress bar dihapus total, Tab Stat & Log dikosongkan
 ]]
 
 local Infinity = loadstring(game:HttpGet("https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/compactlibraryui.lua"))()
@@ -32,7 +33,8 @@ local S = {
     coinCooldown = nil, winCooldown = nil, tokenCooldown = nil,
     statusLabel = nil, lockSpeedCheckbox = nil, syncToggle = nil,
     startStopButton = nil, clearLogButton = nil,
-    resultList = nil, scrollFrame = nil, progressBar = nil, progressText = nil,
+    resultList = nil, scrollFrame = nil,
+    -- PROGRESS BAR DIHAPUS
     resultCount = 0
 }
 
@@ -239,7 +241,7 @@ local function UpdateCooldowns()
     end
 end
 
--- UPDATE STATUS
+-- UPDATE STATUS (PROGRESS BAR DIHAPUS)
 local function UpdateStatus()
     if S.coinLight then
         S.coinLight.BackgroundColor3 = (S.jumpID and S.landingID) and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
@@ -257,10 +259,6 @@ local function UpdateStatus()
         S.statusLabel.Text = ready and (S.running and "RUNNING" or "READY! Mode: "..GetModeDesc()) or "JUMP FROM TOWER FIRST"
         S.statusLabel.TextColor3 = ready and Color3.fromRGB(100,255,100) or Color3.fromRGB(255,100,100)
     end
-    if not S.running then
-        if S.progressText then S.progressText.Text = "0%" end
-        if S.progressBar then S.progressBar.Size = UDim2.new(0,0,1,0) end
-    end
     UpdateSpeedBox()
     UpdateDelayBox()
     if not S.running then UpdateHeight() end
@@ -275,11 +273,6 @@ local function UpdateStatusMsg(c, w, t)
     txt = txt .. (t == "claimed" and "T:✓" or t == "waiting" and "T:⏳" or t == "ready" and "T:▶" or "T:○")
     S.statusLabel.Text = txt .. " | " .. GetModeDesc()
     S.statusLabel.TextColor3 = Color3.fromRGB(100,255,100)
-    if S.progressText then S.progressText.Text = "RUNNING" end
-    if S.progressBar then
-        S.progressBar.Size = UDim2.new(1,0,1,0)
-        S.progressBar.BackgroundColor3 = Color3.fromRGB(0,200,0)
-    end
     UpdateSpeedBox()
     UpdateDelayBox()
     UpdateCooldowns()
@@ -407,7 +400,7 @@ local function SetupCharacter(char)
     end)
 end
 
--- BUILD GUI
+-- BUILD GUI (PROGRESS BAR DIHAPUS TOTAL)
 local function BuildGUI()
     local app = Infinity.new({
         title = "AUTO COIN V4",
@@ -419,7 +412,7 @@ local function BuildGUI()
     -- 1. Nonaktifkan notifikasi
     app.notify = function() end
     
-    -- 2. Hapus status label bawaan library
+    -- 2. Hapus status label bawaan library & Buat ulang tab MAIN
     app.buildMainTab = function(self, parent, fLabel, fInput, fInfo, fResult, fProgress, fButton)
         -- HAPUS STATUS LABEL BAWAAN LIBRARY
         if self.statusLabel then
@@ -677,7 +670,7 @@ local function BuildGUI()
         makeIndicator(0.34, "Win")
         makeIndicator(0.67, "Token")
         
-        -- Results
+        -- Results (ScrollingFrame untuk log)
         self.scrollFrame = Instance.new("ScrollingFrame")
         self.scrollFrame.Size = UDim2.new(1, 0, 1, -148)
         self.scrollFrame.Position = UDim2.new(0, 0, 0, 128)
@@ -696,36 +689,46 @@ local function BuildGUI()
         self.scrollFrame.CanvasSize = UDim2.new(0,0,0,0)
         self.resultCount = 0
         
-        -- Progress
-        local prog = Instance.new("Frame")
-        prog.Size = UDim2.new(1, 0, 0, 10)
-        prog.Position = UDim2.new(0, 0, 1, -10)
-        prog.BackgroundColor3 = Color3.fromRGB(30,30,35)
-        prog.BackgroundTransparency = 0.3
-        prog.BorderSizePixel = 0
-        prog.Parent = cf
-        Instance.new("UICorner").CornerRadius = UDim.new(0,2); Instance.new("UICorner").Parent = prog
-        
-        self.progressBar = Instance.new("Frame")
-        self.progressBar.Size = UDim2.new(0,0,1,0)
-        self.progressBar.BackgroundColor3 = Color3.fromRGB(40,180,40)
-        self.progressBar.BackgroundTransparency = 0.5
-        self.progressBar.BorderSizePixel = 0
-        self.progressBar.Parent = prog
-        Instance.new("UICorner").CornerRadius = UDim.new(0,2); Instance.new("UICorner").Parent = self.progressBar
-        S.progressBar = self.progressBar
-        
-        self.progressText = Instance.new("TextLabel")
-        self.progressText.Size = UDim2.new(1,0,1,0)
-        self.progressText.BackgroundTransparency = 1
-        self.progressText.TextColor3 = Color3.fromRGB(255,255,255)
-        self.progressText.Font = Enum.Font.SourceSansBold
-        self.progressText.TextSize = 9
-        self.progressText.Text = "0%"
-        self.progressText.Parent = prog
-        S.progressText = self.progressText
+        -- PROGRESS BAR DIHAPUS TOTAL - Tidak ada kode pembuatan progress bar di sini
         
         return cf
+    end
+    
+    -- KOSONGKAN TAB STATS & LOGS (Nonaktifkan)
+    app.buildStatsTab = function(self, parent)
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1,0,1,0)
+        frame.BackgroundTransparency = 1
+        frame.Parent = parent
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1,0,1,0)
+        label.BackgroundTransparency = 1
+        label.Text = "Tab Stat dinonaktifkan"
+        label.TextColor3 = Color3.fromRGB(100,100,100)
+        label.Font = Enum.Font.SourceSans
+        label.TextSize = 12
+        label.TextXAlignment = Enum.TextXAlignment.Center
+        label.Parent = frame
+        return frame
+    end
+    
+    app.buildLogsTab = function(self, parent)
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1,0,1,0)
+        frame.BackgroundTransparency = 1
+        frame.Parent = parent
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1,0,1,0)
+        label.BackgroundTransparency = 1
+        label.Text = "Tab Log dinonaktifkan"
+        label.TextColor3 = Color3.fromRGB(100,100,100)
+        label.Font = Enum.Font.SourceSans
+        label.TextSize = 12
+        label.TextXAlignment = Enum.TextXAlignment.Center
+        label.Parent = frame
+        return frame
     end
     
     app:buildGUI()
@@ -744,8 +747,6 @@ local function SetupEvents()
                     S.startStopButton.BackgroundColor3 = Color3.fromRGB(200,50,50)
                     S.lastWinTime = os.time(); S.runTime = 0; S.syncLoopCount = 0
                     if S.syncEnabled then S.lastLoopTime = os.time() end
-                    if S.progressText then S.progressText.Text = "RUNNING" end
-                    if S.progressBar then S.progressBar.Size = UDim2.new(1,0,1,0); S.progressBar.BackgroundColor3 = Color3.fromRGB(0,200,0) end
                     AddResult("▶️ STARTED - Mode: "..GetModeDesc(), Color3.fromRGB(0,255,0))
                     coroutine.wrap(RunLoop)()
                 else
@@ -870,4 +871,4 @@ AddResult("📌 Mode: "..GetModeDesc(), Color3.fromRGB(255,200,0))
 AddResult("📌 START/STOP 1 tombol | CLEAR LOG", Color3.fromRGB(100,200,255))
 AddResult("📌 Lompat dari tower untuk memulai", Color3.fromRGB(255,200,100))
 
-print("AUTO COIN V4 - UI Updated!")
+print("AUTO COIN V4 - Progress bar dihapus total!")
