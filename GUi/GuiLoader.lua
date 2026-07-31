@@ -21,23 +21,31 @@ destroyExistingGUI()
 
 -- Daftar URL skrip untuk dijalankan
 local scriptURLs = {
-    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/FusePet.lua",
-    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/WingShop.lua",
-    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/Titan.lua",
+    "https://raw.githubusercontent.com/upilbalmon/1/refs/heads/main/loader.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/cajtloader.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/GuiStPatrickSeason.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/GOATEvent.lua",
-    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/AllEventGui.lua",
-    "https://raw.githubusercontent.com/upilbalmon/1/refs/heads/main/loader.lua"
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/FusePet.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/WingShop.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/UnlockWorldGUi.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/Titan.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/EnchantPet.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/GearShop.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/AllEventGui.lua"
 }
 
 local buttonNames = {
-    "Fuse Pet",
-    "Wing Shop",
-    "Titan Mesin",
+    "Home",
+    "CAJT Auto",
     "ST Patrick",
     "Goat The Movie",
-    "Load All",
-    "Menu Utama"
+    "Fuse Pet",
+    "Wing Shop",
+    "Teleport to World",
+    "Titan Mesin",
+    "Enchant Pet",
+    "Gear Shop",
+    "Load All event"
 }
 
 -- Konfigurasi UI Compact iOS Style
