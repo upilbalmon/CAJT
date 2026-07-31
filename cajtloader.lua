@@ -19,7 +19,21 @@ local scriptURLs = {
     "https://raw.githubusercontent.com/upilbalmon/Fish/refs/heads/main/Loader.lua",
 }
 
-local buttonNames = {"AutoCWT", "AutoCoinFarm", "Autohatch", "infinity", "GUNUNG", "locations", "TELE", "SPEED", "LOC", "SIZE", "Weater", "TPT", "FISH",}
+local buttonNames = {
+    "AutoCWT", 
+    "AutoCoinFarm", 
+    "Autohatch", 
+    "infinity", 
+    "GUNUNG", 
+    "locations", 
+    "TELE", 
+    "SPEED", 
+    "LOC", 
+    "SIZE", 
+    "Weater", 
+    "TPT", 
+    "FISH",
+}
 
 -- Konfigurasi UI
 local guiSize = UDim2.new(0, 150, 0, 210)
