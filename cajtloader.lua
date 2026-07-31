@@ -26,7 +26,8 @@ local scriptURLs = {
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/AutoHatchEgg.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/infinity.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/locationmark.lua",
-    "https://raw.githubusercontent.com/upilbalmon/1/refs/heads/main/loader.lua"
+    "https://raw.githubusercontent.com/upilbalmon/1/refs/heads/main/loader.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/UnlockWorldGUi.lua"
 }
 
 local buttonNames = {
@@ -35,7 +36,8 @@ local buttonNames = {
     "Auto Hatch",
     "Infinity",
     "Teleport to All World",
-    "Menu Utama"
+    "Menu Utama",
+    "Unlock World"
 }
 
 -- Konfigurasi UI Compact iOS Style
