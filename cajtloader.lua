@@ -23,7 +23,7 @@ destroyExistingGUI()
 local scriptURLs = {
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/cajtv4.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/AutoFarm.lua",
-    "https://raw.githubusercontent.com/upilbalmon/goblox/refs/heads/main/autohatchx10.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/AutoHatchEgg.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/infinity.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/locationmark.lua",
     "https://raw.githubusercontent.com/upilbalmon/1/refs/heads/main/loader.lua"
