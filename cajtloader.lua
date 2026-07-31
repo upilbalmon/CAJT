@@ -21,23 +21,23 @@ destroyExistingGUI()
 
 -- Daftar URL skrip untuk dijalankan
 local scriptURLs = {
+    "https://raw.githubusercontent.com/upilbalmon/1/refs/heads/main/loader.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/GuiLoader.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/infinity.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/cajtv4.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/AutoFarm.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/AutoHatchEgg.lua",
-    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/infinity.lua",
-    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/locationmark.lua",
-    "https://raw.githubusercontent.com/upilbalmon/1/refs/heads/main/loader.lua",
-    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/UnlockWorldGUi.lua"
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/locationmark.lua"
 }
 
 local buttonNames = {
-    "AutoCWT",
+    "Home",
+    "GUi",
+    "Infinity",
+    "Auto Coin Win Token",
     "Auto Farm",
     "Auto Hatch",
-    "Infinity",
-    "Teleport to All World",
-    "Menu Utama",
-    "Unlock World"
+    "Teleport to All World"
 }
 
 -- Konfigurasi UI Compact iOS Style
