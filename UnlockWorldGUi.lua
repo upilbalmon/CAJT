@@ -1,64 +1,77 @@
--- Script Daftar Semua World + Pilih Teleport
-local function listAndTeleport()
-    local rs = game:GetService("ReplicatedStorage")
-    local CfgFind = require(rs.Tool.CfgFind)
-    local worldConf = CfgFind.GetCfgByName("worldConf")
-    local player = game.Players.LocalPlayer
-    local GetData = require(rs.Tool.GetData)
-    local currentWorld = GetData.GetCurWorld(player)
+-- Script Teleport - Versi Ringkas
+local lp = game.Players.LocalPlayer
+local pg = lp:WaitForChild("PlayerGui")
+
+-- Cari Teleport
+local teleport = pg:FindFirstChild("Teleport") or 
+                  (pg:FindFirstChild("ScreenGui") and pg.ScreenGui:FindFirstChild("Teleport"))
+
+if teleport then
+    print("[Teleport] Ditemukan!")
+    teleport.Visible = true
     
-    if not worldConf then
-        print("❌ worldConf tidak ditemukan!")
-        return
-    end
+    -- Cari UI_Control
+    local uiControl = teleport:FindFirstChild("UI_Control")
     
-    print("=" .. string.rep("=", 70))
-    print("🌍 DAFTAR WORLD")
-    print("=" .. string.rep("=", 70))
-    print("📍 World saat ini: " .. currentWorld)
-    print("\n📋 Pilih world untuk teleport:")
-    
-    local worldList = {}
-    for id, data in pairs(worldConf) do
-        table.insert(worldList, {id = id, name = data.ZhName})
-    end
-    
-    -- Urutkan berdasarkan ID
-    table.sort(worldList, function(a, b) return a.id < b.id end)
-    
-    for i, world in pairs(worldList) do
-        local isCurrent = (world.id == currentWorld) and "📍" or "  "
-        print("  " .. isCurrent .. " [" .. i .. "] World " .. world.id .. ": " .. world.name)
-    end
-    
-    print("\n" .. "=" .. string.rep("=", 70))
-    print("💡 Gunakan: teleportToWorld(nomor)")
-    print("   Contoh: teleportToWorld(1) untuk World 1")
-    
-    -- Simpan fungsi global
-    _G.teleportToWorld = function(index)
-        local selected = worldList[index]
-        if not selected then
-            print("❌ World index " .. index .. " tidak ditemukan!")
-            return
+    if uiControl then
+        local success, err = pcall(function()
+            local ctrl = require(uiControl)
+            if ctrl then
+                if ctrl.openUi then
+                    ctrl.openUi()
+                    print("[Teleport] ✅ openUi() berhasil")
+                elseif ctrl.updateUi then
+                    ctrl.updateUi()
+                    print("[Teleport] ✅ updateUi() berhasil")
+                else
+                    -- Manual show
+                    for _, child in ipairs(teleport:GetDescendants()) do
+                        if child:IsA("GuiObject") then
+                            child.Visible = true
+                        end
+                    end
+                    print("[Teleport] ✅ GUI dibuka manual")
+                end
+            end
+        end)
+        if not success then
+            print("[Teleport] Error:", err)
+            -- Fallback manual
+            for _, child in ipairs(teleport:GetDescendants()) do
+                if child:IsA("GuiObject") then
+                    child.Visible = true
+                end
+            end
+            print("[Teleport] ✅ GUI dibuka manual (fallback)")
         end
-        
-        local remoteEvent = rs.Msg:FindFirstChild("RemoteEvent")
-        if remoteEvent then
-            pcall(function()
-                remoteEvent:FireServer("TeleportToTargetWorld", selected.id)
-                print("✅ Teleport ke World " .. selected.id .. " (" .. selected.name .. ") dikirim!")
-            end)
-        else
-            print("❌ RemoteEvent tidak ditemukan!")
+    else
+        -- Manual show semua
+        for _, child in ipairs(teleport:GetDescendants()) do
+            if child:IsA("GuiObject") then
+                child.Visible = true
+            end
+        end
+        print("[Teleport] ✅ GUI dibuka secara manual")
+    end
+    
+    -- Aktifkan komponen utama
+    local frame = teleport:FindFirstChild("Frame")
+    if frame then
+        frame.Visible = true
+        local scrollFrame = frame:FindFirstChild("ScrollingFrame")
+        if scrollFrame then
+            scrollFrame.Visible = true
         end
     end
     
-    print("\n✅ Fungsi _G.teleportToWorld() tersedia!")
+    local bg = teleport:FindFirstChild("BG")
+    if bg then
+        bg.Visible = true
+        local exitBtn = bg:FindFirstChild("Exit")
+        if exitBtn then exitBtn.Visible = true end
+    end
+    
+    print("[Teleport] 🎉 Teleport GUI berhasil dibuka!")
+else
+    warn("[Teleport] ❌ Tidak ditemukan!")
 end
-
-listAndTeleport()
-
--- Contoh setelah script dijalankan:
--- _G.teleportToWorld(1)  -- Teleport ke World 1
--- _G.teleportToWorld(15) -- Teleport ke World 15 (Shanghai)
