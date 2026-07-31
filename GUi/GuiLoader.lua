@@ -26,7 +26,8 @@ local scriptURLs = {
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/Titan.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/GuiStPatrickSeason.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/GOATEvent.lua",
-    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/AllEventGui.lua"
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/AllEventGui.lua",
+    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/GuiLoader.lua"
 }
 
 local buttonNames = {
@@ -35,7 +36,8 @@ local buttonNames = {
     "Titan Mesin",
     "ST Patrick",
     "Goat The Movie",
-    "Load All"
+    "Load All",
+    "Menu Utama"
 }
 
 -- Konfigurasi UI Compact iOS Style
