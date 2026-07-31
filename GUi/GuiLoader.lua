@@ -27,7 +27,7 @@ local scriptURLs = {
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/GuiStPatrickSeason.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/GOATEvent.lua",
     "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/AllEventGui.lua",
-    "https://raw.githubusercontent.com/upilbalmon/CAJT/refs/heads/main/GUi/GuiLoader.lua"
+    "https://raw.githubusercontent.com/upilbalmon/1/refs/heads/main/loader.lua"
 }
 
 local buttonNames = {
@@ -98,7 +98,7 @@ titleBar.BackgroundTransparency = 0 -- Pastikan tidak transparan
 titleBar.BorderSizePixel = 0
 titleBar.Parent = mainFrame
 
--- Corner hanya di bagian atas
+-- Corner hanya di bagian atasb
 local titleCorner = Instance.new("UICorner")
 titleCorner.CornerRadius = UDim.new(0, 14)
 titleCorner.Parent = titleBar
@@ -107,7 +107,7 @@ titleCorner.Parent = titleBar
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -50, 1, 0)
 titleLabel.Position = UDim2.new(0, 25, 0, 0)
-titleLabel.Text = "Menu Skrip"
+titleLabel.Text = "GUi"
 titleLabel.TextColor3 = theme.textPrimary
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 14
