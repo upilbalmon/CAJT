@@ -1,38 +1,42 @@
 --[[
-    AUTO COIN V3 - Enhanced Version
-    Features:
-    1. Auto height calculation: (speed × 2.8) × delay
-    2. Dynamic auto win delay: 10000 / speed
-    3. Compact 200x200 GUI
-    4. All original functionality preserved
-    5. Auto token delay formula: (10000/speed) with 1 decimal place
-    6. Max height limit: 14400
-    7. Lock delay setting checkbox
-    8. Speed validation: measurement minimum 3 seconds
-    9. Speed detection stops after validation
-    10. Optimized CPU usage (heartbeat interval)
-    11. Hook stops after all IDs collected OR timeout (3 minutes)
-    12. GUI validation - prevents duplicate GUI instances
-    13. Safe GUI destruction - ensures all scripts stopped before destroying
+    AUTO COIN V4
 --]]
 
 ------ SERVICES ------
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+------ THEME (iOS Compact Style) ------
+local THEME = {
+    background = Color3.fromRGB(242, 242, 247),
+    cardBackground = Color3.fromRGB(255, 255, 255),
+    primaryBlue = Color3.fromRGB(0, 122, 255),
+    primaryRed = Color3.fromRGB(255, 59, 48),
+    primaryYellow = Color3.fromRGB(255, 204, 0),
+    textPrimary = Color3.fromRGB(0, 0, 0),
+    textSecondary = Color3.fromRGB(142, 142, 147),
+    textWhite = Color3.fromRGB(255, 255, 255),
+    separator = Color3.fromRGB(229, 229, 234),
+    buttonNormal = Color3.fromRGB(255, 255, 255),
+    buttonHover = Color3.fromRGB(240, 240, 245),
+    buttonActive = Color3.fromRGB(0, 122, 255),
+    ledGreen = Color3.fromRGB(52, 199, 89),
+    ledRed = Color3.fromRGB(255, 59, 48),
+}
 
 ------ CONSTANTS ------
-local PAUSE_INTERVAL = 60 * 60  -- 1 hour
-local PAUSE_DURATION = 30       -- 30 seconds
-local WIN_DELAY_BASE = 10000    -- Base for auto win delay calculation
+local PAUSE_INTERVAL = 60 * 60
+local PAUSE_DURATION = 30
+local WIN_DELAY_BASE = 10000
+local TOKEN_DELAY_BASE = 10000
 local DEFAULT_HEIGHT = 5000
 local DEFAULT_DELAY = 5
-local HEIGHT_MULTIPLIER = 2.8   -- Height calculation multiplier
-local MAX_HEIGHT = 14400        -- Maximum height limit
-local MIN_SPEED_MEASUREMENT = 3 -- Minimum seconds for speed measurement
-local HEARTBEAT_INTERVAL = 5    -- Process every 5 frames to save CPU
-local HOOK_TIMEOUT = 180        -- 3 minutes timeout for hook
-local DESTROY_WAIT_TIME = 1     -- Wait time for cleanup before destroying GUI
+local HEIGHT_MULTIPLIER = 2.8
+local MAX_HEIGHT = 14400
+local MIN_CLIMB_DURATION = 2
 
 ------ STATE MANAGEMENT ------
 local State = {
@@ -44,6 +48,12 @@ local State = {
     running = false,
     autoWinEnabled = false,
     autoTokenEnabled = false,
+    lockSpeed = false,
+    tokenClaimed = false,
+    tokenClaimTime = 0,
+    coinDelay = DEFAULT_DELAY,      -- ABSOLUT dari user input
+    currentTokenDelay = 0,          -- Untuk display cooldown token
+    currentWinDelay = 0,            -- Untuk display cooldown win
     runTime = 0,
     lastLoopTime = 0,
     nextLoopTime = 0,
@@ -55,520 +65,603 @@ local State = {
     climbStartY = 0,
     climbStartTime = 0,
     maxY = 0,
-    lockDelay = false,
-    speedValidated = false,
-    speedMeasurementTime = 0,
-    speedDetectionActive = true,
-    speedDetectionConnections = {},
-    hookActive = true,
-    hookCleanup = nil,
-    hookStartTime = 0,
-    hookTimedOut = false,
-    guiInstance = nil,
-    isDestroying = false, -- Flag untuk mencegah destroy berulang
-    runLoopCoroutine = nil -- Referensi ke coroutine run loop
 }
 
 ------ UTILITY FUNCTIONS ------
 local function GetWinDelay()
-    return State.climbSpeed > 0 and (WIN_DELAY_BASE / State.climbSpeed) or 20
+    if State.autoWinEnabled and State.climbSpeed > 0 then
+        return math.floor((WIN_DELAY_BASE / State.climbSpeed) * 10) / 10
+    end
+    return 0
 end
 
+local function GetTokenDelay()
+    if State.autoTokenEnabled and State.climbSpeed > 0 then
+        return math.floor((TOKEN_DELAY_BASE / State.climbSpeed) * 10) / 10
+    end
+    return 0
+end
+
+-- Height = f(Speed, Delay) - SATU ARAH
 local function CalculateHeight()
-    local delay = tonumber(GUI.DelayTextBox.Text) or DEFAULT_DELAY
+    local delay = State.coinDelay  -- ← HANYA BACA
     local calculatedHeight = math.floor((State.climbSpeed * HEIGHT_MULTIPLIER) * delay)
     return math.min(calculatedHeight, MAX_HEIGHT)
 end
 
 local function UpdateHeight()
-    if State.climbSpeed > 0 and State.speedValidated then
-        GUI.HeightTextBox.Text = tostring(CalculateHeight())
+    if State.climbSpeed > 0 then
+        GUI.HeightLabel.Text = string.format("Height: %d", CalculateHeight())
     end
 end
 
-local function CheckAllIDsCollected()
-    return State.jumpID ~= nil and 
-           State.landingID ~= nil and 
-           State.winID ~= nil and 
-           State.magicTokenID ~= nil
-end
-
-local function GetCollectedIDsCount()
-    local count = 0
-    if State.jumpID then count = count + 1 end
-    if State.landingID then count = count + 1 end
-    if State.winID then count = count + 1 end
-    if State.magicTokenID then count = count + 1 end
-    return count
-end
-
------- GUI VALIDATION ------
-local function IsGUIExists()
-    local player = Players.LocalPlayer
-    if not player then return false end
-    
-    local playerGui = player:FindFirstChild("PlayerGui")
-    if not playerGui then return false end
-    
-    local existingGUI = playerGui:FindFirstChild("CoinClaimerGUI")
-    if existingGUI then
-        return true
-    end
-    
-    return false
-end
-
-local function DestroyExistingGUI()
-    local player = Players.LocalPlayer
-    if not player then return end
-    
-    local playerGui = player:FindFirstChild("PlayerGui")
-    if not playerGui then return end
-    
-    local existingGUI = playerGui:FindFirstChild("CoinClaimerGUI")
-    if existingGUI then
-        print("Destroying existing GUI instance...")
-        existingGUI:Destroy()
-        task.wait(0.5)
-    end
-end
-
------- SAFE GUI DESTRUCTION ------
-local function StopAllProcesses()
-    print("🛑 Stopping all processes...")
-    
-    -- 1. Stop running loop
-    if State.running then
-        State.running = false
-        print("✓ Running loop stopped")
-    end
-    
-    -- 2. Stop hook
-    if State.hookActive then
-        State.hookActive = false
-        if State.hookCleanup then
-            State.hookCleanup()
-            State.hookCleanup = nil
-        end
-        print("✓ Hook stopped")
-    end
-    
-    -- 3. Stop speed detection
-    if State.speedDetectionActive then
-        State.speedDetectionActive = false
-        for _, connection in ipairs(State.speedDetectionConnections) do
-            if connection and connection.Disconnect then
-                connection:Disconnect()
-            end
-        end
-        State.speedDetectionConnections = {}
-        print("✓ Speed detection stopped")
-    end
-    
-    -- 4. Disable hookEnabled
-    State.hookEnabled = false
-    print("✓ All processes stopped")
-end
-
-local function ValidateAllStopped()
-    -- Cek apakah semua proses sudah berhenti
-    local allStopped = true
-    local issues = {}
-    
-    if State.running then
-        allStopped = false
-        table.insert(issues, "Running loop masih aktif")
-    end
-    
-    if State.hookActive then
-        allStopped = false
-        table.insert(issues, "Hook masih aktif")
-    end
-    
-    if State.speedDetectionActive then
-        allStopped = false
-        table.insert(issues, "Speed detection masih aktif")
-    end
-    
-    if State.hookEnabled then
-        allStopped = false
-        table.insert(issues, "Hook enabled masih true")
-    end
-    
-    if #issues > 0 then
-        print("⚠️ Proses masih berjalan:")
-        for _, issue in ipairs(issues) do
-            print("  - " .. issue)
-        end
+------ UPDATE DELAYS (HANYA BACA DARI INPUT) ------
+local function UpdateDelays()
+    -- HANYA baca dari input, tidak ada yang mengubah selain user
+    local input = tonumber(GUI.DelayTextBox.Text)
+    if input and input > 0 then
+        State.coinDelay = input
     else
-        print("✓ Semua proses sudah berhenti")
+        State.coinDelay = DEFAULT_DELAY
+        GUI.DelayTextBox.Text = string.format("%.1f", DEFAULT_DELAY)
     end
     
-    return allStopped
+    -- Hitung delay untuk display cooldown saja (TIDAK mempengaruhi coinDelay)
+    State.currentTokenDelay = GetTokenDelay()
+    State.currentWinDelay = GetWinDelay()
+    
+    -- Update display height
+    if State.climbSpeed > 0 then
+        UpdateHeight()
+    end
 end
 
-local function SafeDestroyGUI()
-    -- Cegah destroy berulang
-    if State.isDestroying then
-        print("⚠️ GUI already being destroyed, skipping...")
-        return
+------ IOS SWITCH COMPONENT ------
+local function CreateiOSSwitch(parent, position, initialState, labelText)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 10)
+    container.Position = position
+    container.BackgroundTransparency = 1
+    container.Parent = parent
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.Text = labelText
+    label.TextColor3 = THEME.textPrimary
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamMedium
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+    
+    local track = Instance.new("TextButton")
+    track.Size = UDim2.new(0, 18, 0, 10)
+    track.Position = UDim2.new(1, -18, 0.5, -5)
+    track.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+    track.BackgroundTransparency = 0
+    track.BorderSizePixel = 0
+    track.AutoButtonColor = false
+    track.Text = ""
+    track.Parent = container
+    
+    local trackCorner = Instance.new("UICorner")
+    trackCorner.CornerRadius = UDim.new(0, 5)
+    trackCorner.Parent = track
+    
+    local knob = Instance.new("TextButton")
+    knob.Size = UDim2.new(0, 9, 0, 9)
+    knob.Position = UDim2.new(0, 0.5, 0.5, -4.5)
+    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.BackgroundTransparency = 0
+    knob.BorderSizePixel = 0
+    knob.AutoButtonColor = false
+    knob.Text = ""
+    knob.Parent = track
+    
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(0, 4.5)
+    knobCorner.Parent = knob
+    
+    local knobShadow = Instance.new("UIShadow")
+    knobShadow.Color = Color3.fromRGB(0, 0, 0)
+    knobShadow.Transparency = 0.2
+    knobShadow.Offset = UDim2.new(0, 0, 0, 0.5)
+    knobShadow.Parent = knob
+    
+    local isOn = initialState or false
+    local onToggle = nil
+    
+    local function updateSwitch()
+        local targetPosition = isOn and UDim2.new(0, 8.5, 0.5, -4.5) or UDim2.new(0, 0.5, 0.5, -4.5)
+        local targetColor = isOn and THEME.primaryBlue or Color3.fromRGB(200, 200, 200)
+        
+        TweenService:Create(track, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundColor3 = targetColor
+        }):Play()
+        
+        TweenService:Create(knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = targetPosition
+        }):Play()
     end
     
-    if not State.guiInstance then
-        print("⚠️ GUI instance not found, skipping...")
-        return
-    end
+    updateSwitch()
     
-    State.isDestroying = true
-    print("🔄 Starting safe GUI destruction...")
-    
-    -- Step 1: Stop semua proses
-    StopAllProcesses()
-    
-    -- Step 2: Tunggu sebentar untuk memastikan semua proses berhenti
-    print("⏳ Waiting for processes to fully stop...")
-    task.wait(DESTROY_WAIT_TIME)
-    
-    -- Step 3: Validasi semua proses sudah berhenti
-    local allStopped = ValidateAllStopped()
-    
-    if not allStopped then
-        print("⚠️ Some processes still running! Force stopping...")
-        -- Force stop dengan reset semua state
-        State.running = false
-        State.hookActive = false
-        State.speedDetectionActive = false
-        State.hookEnabled = false
-        task.wait(0.5)
-    end
-    
-    -- Step 4: Destroy GUI
-    print("🗑️ Destroying GUI...")
-    local success, err = pcall(function()
-        if State.guiInstance and State.guiInstance.Parent then
-            State.guiInstance:Destroy()
+    local function toggle()
+        isOn = not isOn
+        updateSwitch()
+        if onToggle then
+            onToggle(isOn)
         end
+    end
+    
+    track.MouseButton1Click:Connect(toggle)
+    knob.MouseButton1Click:Connect(toggle)
+    
+    track.MouseEnter:Connect(function()
+        track.BackgroundColor3 = isOn and Color3.fromRGB(0, 112, 235) or Color3.fromRGB(180, 180, 180)
+    end)
+    track.MouseLeave:Connect(function()
+        track.BackgroundColor3 = isOn and THEME.primaryBlue or Color3.fromRGB(200, 200, 200)
     end)
     
-    if not success then
-        warn("Error destroying GUI: " .. tostring(err))
+    return {
+        setOn = function(value)
+            isOn = value
+            updateSwitch()
+        end,
+        isOn = function()
+            return isOn
+        end,
+        toggle = toggle,
+        onChange = function(callback)
+            onToggle = callback
+        end,
+    }
+end
+
+------ STATUS FUNCTIONS ------
+local function UpdateStatusBar()
+    -- COIN: Hijau jika jumpID dan landingID ada
+    local coinReady = State.jumpID ~= nil and State.landingID ~= nil
+    local coinLed = coinReady and "●" or "○"
+    local coinColor = coinReady and THEME.ledGreen or THEME.ledRed
+    local coinTime = State.running and string.format("%.1fs", math.max(0, State.nextLoopTime - tick())) or "0.0s"
+    
+    -- WIN: Hijau jika winID ada
+    local winReady = State.winID ~= nil
+    local winLed = winReady and "●" or "○"
+    local winColor = winReady and THEME.ledGreen or THEME.ledRed
+    local winTime = "0.0s"
+    if State.autoWinEnabled and State.winID and State.running then
+        local currentWinDelay = State.currentWinDelay
+        winTime = string.format("%.1fs", math.max(0, currentWinDelay - (tick() - State.lastWinTime)))
     end
     
-    -- Step 5: Clear references
-    State.guiInstance = nil
-    State.runLoopCoroutine = nil
+    -- TOKEN: Hijau jika magicTokenID ada (tidak peduli switch ON/OFF)
+    local tokenReady = State.magicTokenID ~= nil
+    local tokenLed = tokenReady and "●" or "○"
+    local tokenColor = tokenReady and THEME.ledGreen or THEME.ledRed
     
-    -- Step 6: Final cleanup
-    if State.hookCleanup then
-        State.hookCleanup()
-        State.hookCleanup = nil
-    end
-    
-    for _, connection in ipairs(State.speedDetectionConnections) do
-        if connection and connection.Disconnect then
-            connection:Disconnect()
+    -- Cooldown token: HANYA BACA delay, tidak mengubahnya
+    local tokenTime = "0.0s"
+    if State.autoTokenEnabled and State.magicTokenID and State.running then
+        local halfDelay = State.coinDelay / 2  -- ← HANYA BACA
+        
+        if State.tokenClaimed then
+            local remainingToNext = State.nextLoopTime - tick()
+            tokenTime = string.format("%.1fs", math.max(0, remainingToNext))
+        else
+            local remainingToMidpoint = (State.lastLoopTime + halfDelay) - tick()
+            tokenTime = string.format("%.1fs", math.max(0, remainingToMidpoint))
         end
     end
-    State.speedDetectionConnections = {}
     
-    State.isDestroying = false
-    print("✅ GUI destroyed successfully!")
+    GUI.CoinLabel.Text = string.format("Coin %s %s", coinLed, coinTime)
+    GUI.CoinLabel.TextColor3 = coinColor
+    
+    GUI.WinLabel.Text = string.format("Win %s %s", winLed, winTime)
+    GUI.WinLabel.TextColor3 = winColor
+    
+    GUI.TokenLabel.Text = string.format("Token %s %s", tokenLed, tokenTime)
+    GUI.TokenLabel.TextColor3 = tokenColor
+end
+
+local function UpdateStatusMessage()
+    local isReady = State.jumpID ~= nil and State.landingID ~= nil
+    
+    if not isReady then
+        GUI.StatusMessage.Text = "JUMP FROM TOWER FIRST"
+        GUI.StatusMessage.TextColor3 = THEME.primaryRed
+    elseif State.running then
+        local msg = "RUNNING..."
+        if State.autoTokenEnabled then
+            msg = msg .. " ⚡"
+        end
+        if State.autoWinEnabled then
+            msg = msg .. " 🏆"
+        end
+        GUI.StatusMessage.Text = msg
+        GUI.StatusMessage.TextColor3 = THEME.primaryBlue
+    else
+        GUI.StatusMessage.Text = "READY TO START!"
+        GUI.StatusMessage.TextColor3 = THEME.ledGreen
+    end
+end
+
+local function ShowTemporaryMessage(text, color, duration)
+    local oldText = GUI.StatusMessage.Text
+    local oldColor = GUI.StatusMessage.TextColor3
+    
+    GUI.StatusMessage.Text = text
+    GUI.StatusMessage.TextColor3 = color
+    
+    task.delay(duration or 1.5, function()
+        if State.hookEnabled then
+            GUI.StatusMessage.Text = oldText
+            GUI.StatusMessage.TextColor3 = oldColor
+        end
+    end)
+end
+
+local function UpdateStatus()
+    local isReady = State.jumpID ~= nil and State.landingID ~= nil
+    
+    if isReady then
+        State.isReady = true
+        if State.running then
+            GUI.StartStopButton.BackgroundColor3 = THEME.primaryBlue
+            GUI.StartStopButton.TextColor3 = THEME.textWhite
+            GUI.StartStopButton.Text = "AUTO COIN ON"
+        else
+            GUI.StartStopButton.BackgroundColor3 = THEME.cardBackground
+            GUI.StartStopButton.TextColor3 = THEME.primaryBlue
+            GUI.StartStopButton.Text = "START AUTO COIN"
+        end
+    else
+        State.isReady = false
+        GUI.StartStopButton.BackgroundColor3 = THEME.cardBackground
+        GUI.StartStopButton.TextColor3 = THEME.textSecondary
+        GUI.StartStopButton.Text = "START AUTO COIN"
+    end
+    
+    UpdateStatusMessage()
+    UpdateStatusBar()
 end
 
 ------ GUI CREATION ------
 local function CreateGUI()
-    -- VALIDASI: Cek dan destroy GUI existing dengan safe destroy
-    if IsGUIExists() then
-        print("⚠️ GUI already exists! Destroying old instance with safe method...")
-        SafeDestroyGUI()
-    end
-    
     local player = Players.LocalPlayer
     local playerGui = player:WaitForChild("PlayerGui")
 
-    -- Main ScreenGui
+    if playerGui:FindFirstChild("CoinClaimerGUI") then
+        playerGui:FindFirstChild("CoinClaimerGUI"):Destroy()
+    end
+
     local MainFrame = Instance.new("ScreenGui")
     MainFrame.Name = "CoinClaimerGUI"
     MainFrame.Parent = playerGui
     MainFrame.ResetOnSpawn = false
     MainFrame.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-    -- Main Frame (200x200)
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(0, 200, 0, 200)
-    Frame.Position = UDim2.new(0.5, -100, 0.5, -100)
-    Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    Frame.BackgroundTransparency = 0.1
+    Frame.Size = UDim2.new(0, 200, 0, 245)
+    Frame.Position = UDim2.new(0.5, -100, 0.5, -122.5)
+    Frame.BackgroundColor3 = THEME.background
+    Frame.BackgroundTransparency = 0
     Frame.BorderSizePixel = 0
     Frame.Parent = MainFrame
     Frame.Draggable = true
     Frame.Active = true
+    Frame.ClipsDescendants = true
 
-    -- Rounded Corners
     local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 8)
+    UICorner.CornerRadius = UDim.new(0, 14)
     UICorner.Parent = Frame
 
     -- Title Bar
     local TitleBar = Instance.new("Frame")
-    TitleBar.Size = UDim2.new(1, 0, 0, 25)
+    TitleBar.Size = UDim2.new(1, 0, 0, 32)
     TitleBar.Position = UDim2.new(0, 0, 0, 0)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    TitleBar.BackgroundColor3 = THEME.background
+    TitleBar.BackgroundTransparency = 0
     TitleBar.BorderSizePixel = 0
     TitleBar.Parent = Frame
 
     local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 8, 0, 0)
+    TitleCorner.CornerRadius = UDim.new(0, 14, 0, 0)
     TitleCorner.Parent = TitleBar
 
-    -- Title Text
     local TitleText = Instance.new("TextLabel")
     TitleText.Size = UDim2.new(0.7, 0, 1, 0)
     TitleText.Position = UDim2.new(0.15, 0, 0, 0)
     TitleText.Text = "CAJT AUTO GACOR"
-    TitleText.TextColor3 = Color3.new(1, 1, 1)
+    TitleText.TextColor3 = THEME.textPrimary
     TitleText.BackgroundTransparency = 1
     TitleText.Font = Enum.Font.GothamBold
-    TitleText.TextSize = 13
+    TitleText.TextSize = 14
     TitleText.Parent = TitleBar
 
-    -- Close Button
     local CloseButton = Instance.new("TextButton")
-    CloseButton.Size = UDim2.new(0, 25, 0, 25)
-    CloseButton.Position = UDim2.new(1, -25, 0, 0)
-    CloseButton.Text = "×"
+    CloseButton.Size = UDim2.new(0, 20, 0, 20)
+    CloseButton.Position = UDim2.new(1, -26, 0, 6)
+    CloseButton.Text = "X"
     CloseButton.Font = Enum.Font.GothamBold
-    CloseButton.TextSize = 16
-    CloseButton.TextColor3 = Color3.new(1, 1, 1)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    CloseButton.TextSize = 12
+    CloseButton.TextColor3 = THEME.textWhite
+    CloseButton.BackgroundColor3 = THEME.primaryRed
+    CloseButton.AutoButtonColor = false
     CloseButton.Parent = TitleBar
 
     local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 4)
+    CloseCorner.CornerRadius = UDim.new(0, 10)
     CloseCorner.Parent = CloseButton
 
-    -- Minimize Button
     local MinimizeButton = Instance.new("TextButton")
-    MinimizeButton.Size = UDim2.new(0, 25, 0, 25)
-    MinimizeButton.Position = UDim2.new(1, -50, 0, 0)
-    MinimizeButton.Text = "-"
+    MinimizeButton.Size = UDim2.new(0, 20, 0, 20)
+    MinimizeButton.Position = UDim2.new(1, -50, 0, 6)
+    MinimizeButton.Text = "−"
     MinimizeButton.Font = Enum.Font.GothamBold
-    MinimizeButton.TextSize = 16
-    MinimizeButton.TextColor3 = Color3.new(1, 1, 1)
-    MinimizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    MinimizeButton.TextSize = 14
+    MinimizeButton.TextColor3 = THEME.textWhite
+    MinimizeButton.BackgroundColor3 = THEME.primaryYellow
+    MinimizeButton.AutoButtonColor = false
     MinimizeButton.Parent = TitleBar
 
     local MinimizeCorner = Instance.new("UICorner")
-    MinimizeCorner.CornerRadius = UDim.new(0, 4)
+    MinimizeCorner.CornerRadius = UDim.new(0, 10)
     MinimizeCorner.Parent = MinimizeButton
 
-    -- Content Frame
+    -- Content
     local Content = Instance.new("Frame")
     Content.Name = "Content"
-    Content.Size = UDim2.new(1, -10, 1, -35)
-    Content.Position = UDim2.new(0, 5, 0, 30)
+    Content.Size = UDim2.new(1, -12, 1, -42)
+    Content.Position = UDim2.new(0, 6, 0, 36)
     Content.BackgroundTransparency = 1
     Content.Parent = Frame
 
-    -- Input Frame
-    local InputFrame = Instance.new("Frame")
-    InputFrame.Size = UDim2.new(1, 0, 0, 50)
-    InputFrame.Position = UDim2.new(0, 0, 0, 0)
-    InputFrame.BackgroundTransparency = 1
-    InputFrame.Parent = Content
+    -- ===== STATUS GROUP =====
+    local StatusGroup = Instance.new("Frame")
+    StatusGroup.Size = UDim2.new(1, 0, 0, 75)
+    StatusGroup.Position = UDim2.new(0, 0, 0, 0)
+    StatusGroup.BackgroundColor3 = THEME.cardBackground
+    StatusGroup.BackgroundTransparency = 0
+    StatusGroup.BorderSizePixel = 0
+    StatusGroup.Parent = Content
 
-    -- Height Input
-    local HeightLabel = Instance.new("TextLabel")
-    HeightLabel.Size = UDim2.new(0.4, 0, 0, 20)
-    HeightLabel.Position = UDim2.new(0, 0, 0, 0)
-    HeightLabel.Text = "Height:"
-    HeightLabel.TextColor3 = Color3.new(1, 1, 1)
-    HeightLabel.BackgroundTransparency = 1
-    HeightLabel.Font = Enum.Font.Gotham
-    HeightLabel.TextSize = 11
-    HeightLabel.TextXAlignment = Enum.TextXAlignment.Left
-    HeightLabel.Parent = InputFrame
+    local StatusCorner = Instance.new("UICorner")
+    StatusCorner.CornerRadius = UDim.new(0, 8)
+    StatusCorner.Parent = StatusGroup
 
-    local HeightBox = Instance.new("TextBox")
-    HeightBox.Size = UDim2.new(0.6, 0, 0, 20)
-    HeightBox.Position = UDim2.new(0.4, 0, 0, 0)
-    HeightBox.Text = tostring(DEFAULT_HEIGHT)
-    HeightBox.PlaceholderText = "Auto"
-    HeightBox.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    HeightBox.TextColor3 = Color3.new(1, 1, 1)
-    HeightBox.Font = Enum.Font.Gotham
-    HeightBox.TextSize = 11
-    HeightBox.Parent = InputFrame
+    local StatusBorder = Instance.new("UIStroke")
+    StatusBorder.Color = THEME.separator
+    StatusBorder.Thickness = 0.5
+    StatusBorder.Parent = StatusGroup
 
-    local HeightCorner = Instance.new("UICorner")
-    HeightCorner.CornerRadius = UDim.new(0, 4)
-    HeightCorner.Parent = HeightBox
+    -- Status Bar Container (3 labels terpisah untuk warna LED)
+    local StatusBarContainer = Instance.new("Frame")
+    StatusBarContainer.Size = UDim2.new(1, -10, 0, 15)
+    StatusBarContainer.Position = UDim2.new(0, 5, 0, 2)
+    StatusBarContainer.BackgroundTransparency = 1
+    StatusBarContainer.Parent = StatusGroup
 
-    -- Delay Input
-    local DelayLabel = Instance.new("TextLabel")
-    DelayLabel.Size = UDim2.new(0.4, 0, 0, 20)
-    DelayLabel.Position = UDim2.new(0, 0, 0, 25)
-    DelayLabel.Text = "Delay:"
-    DelayLabel.TextColor3 = Color3.new(1, 1, 1)
-    DelayLabel.BackgroundTransparency = 1
-    DelayLabel.Font = Enum.Font.Gotham
-    DelayLabel.TextSize = 11
-    DelayLabel.TextXAlignment = Enum.TextXAlignment.Left
-    DelayLabel.Parent = InputFrame
+    -- Coin Label
+    local CoinLabel = Instance.new("TextLabel")
+    CoinLabel.Size = UDim2.new(0.33, 0, 1, 0)
+    CoinLabel.Position = UDim2.new(0, 0, 0, 0)
+    CoinLabel.Text = "Coin ○ 0.0s"
+    CoinLabel.TextColor3 = THEME.ledRed
+    CoinLabel.BackgroundTransparency = 1
+    CoinLabel.Font = Enum.Font.GothamMedium
+    CoinLabel.TextSize = 11
+    CoinLabel.TextXAlignment = Enum.TextXAlignment.Center
+    CoinLabel.Parent = StatusBarContainer
 
-    local DelayBox = Instance.new("TextBox")
-    DelayBox.Size = UDim2.new(0.6, 0, 0, 20)
-    DelayBox.Position = UDim2.new(0.4, 0, 0, 25)
-    DelayBox.Text = tostring(DEFAULT_DELAY)
-    DelayBox.PlaceholderText = "Sec"
-    DelayBox.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    DelayBox.TextColor3 = Color3.new(1, 1, 1)
-    DelayBox.Font = Enum.Font.Gotham
-    DelayBox.TextSize = 11
-    DelayBox.Parent = InputFrame
+    -- Win Label
+    local WinLabel = Instance.new("TextLabel")
+    WinLabel.Size = UDim2.new(0.33, 0, 1, 0)
+    WinLabel.Position = UDim2.new(0.33, 0, 0, 0)
+    WinLabel.Text = "Win ○ 0.0s"
+    WinLabel.TextColor3 = THEME.ledRed
+    WinLabel.BackgroundTransparency = 1
+    WinLabel.Font = Enum.Font.GothamMedium
+    WinLabel.TextSize = 11
+    WinLabel.TextXAlignment = Enum.TextXAlignment.Center
+    WinLabel.Parent = StatusBarContainer
 
-    local DelayCorner = Instance.new("UICorner")
-    DelayCorner.CornerRadius = UDim.new(0, 4)
-    DelayCorner.Parent = DelayBox
+    -- Token Label
+    local TokenLabel = Instance.new("TextLabel")
+    TokenLabel.Size = UDim2.new(0.33, 0, 1, 0)
+    TokenLabel.Position = UDim2.new(0.66, 0, 0, 0)
+    TokenLabel.Text = "Token ○ 0.0s"
+    TokenLabel.TextColor3 = THEME.ledRed
+    TokenLabel.BackgroundTransparency = 1
+    TokenLabel.Font = Enum.Font.GothamMedium
+    TokenLabel.TextSize = 11
+    TokenLabel.TextXAlignment = Enum.TextXAlignment.Center
+    TokenLabel.Parent = StatusBarContainer
 
-    -- Lock Delay Checkbox
-    local LockDelayFrame = Instance.new("Frame")
-    LockDelayFrame.Size = UDim2.new(1, 0, 0, 15)
-    LockDelayFrame.Position = UDim2.new(0, 0, 0, 50)
-    LockDelayFrame.BackgroundTransparency = 1
-    LockDelayFrame.Parent = InputFrame
-
-    local LockDelayBox = Instance.new("TextButton")
-    LockDelayBox.Size = UDim2.new(0, 15, 0, 15)
-    LockDelayBox.Position = UDim2.new(0, 0, 0, 0)
-    LockDelayBox.Text = ""
-    LockDelayBox.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    LockDelayBox.Parent = LockDelayFrame
-
-    local LockDelayCorner = Instance.new("UICorner")
-    LockDelayCorner.CornerRadius = UDim.new(0, 3)
-    LockDelayCorner.Parent = LockDelayBox
-
-    local LockDelayLabel = Instance.new("TextLabel")
-    LockDelayLabel.Size = UDim2.new(1, -20, 1, 0)
-    LockDelayLabel.Position = UDim2.new(0, 20, 0, 0)
-    LockDelayLabel.Text = "Lock Delay Setting"
-    LockDelayLabel.TextColor3 = Color3.new(1, 1, 1)
-    LockDelayLabel.BackgroundTransparency = 1
-    LockDelayLabel.Font = Enum.Font.Gotham
-    LockDelayLabel.TextSize = 10
-    LockDelayLabel.TextXAlignment = Enum.TextXAlignment.Left
-    LockDelayLabel.Parent = LockDelayFrame
-
-    -- Status Indicator
-    local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Size = UDim2.new(1, 0, 0, 15)
-    StatusLabel.Position = UDim2.new(0, 0, 0, 70)
-    StatusLabel.Text = "Coin[○] Win[○] Token[○]"
-    StatusLabel.TextColor3 = Color3.new(1, 1, 1)
-    StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Font = Enum.Font.Gotham
-    StatusLabel.TextSize = 11
-    StatusLabel.TextXAlignment = Enum.TextXAlignment.Center
-    StatusLabel.Parent = Content
-
-    -- Speed Indicator
+    -- Speed Label
     local SpeedLabel = Instance.new("TextLabel")
-    SpeedLabel.Size = UDim2.new(1, 0, 0, 15)
-    SpeedLabel.Position = UDim2.new(0, 0, 0, 85)
+    SpeedLabel.Size = UDim2.new(1, -10, 0, 15)
+    SpeedLabel.Position = UDim2.new(0, 5, 0, 19)
     SpeedLabel.Text = "Speed: 0 studs/s"
-    SpeedLabel.TextColor3 = Color3.new(1, 1, 1)
+    SpeedLabel.TextColor3 = THEME.primaryBlue
     SpeedLabel.BackgroundTransparency = 1
-    SpeedLabel.Font = Enum.Font.Gotham
+    SpeedLabel.Font = Enum.Font.GothamMedium
     SpeedLabel.TextSize = 11
     SpeedLabel.TextXAlignment = Enum.TextXAlignment.Center
-    SpeedLabel.Parent = Content
+    SpeedLabel.Parent = StatusGroup
 
-    -- Main Button
-    local MainButton = Instance.new("TextButton")
-    MainButton.Size = UDim2.new(1, 0, 0, 30)
-    MainButton.Position = UDim2.new(0, 0, 0, 105)
-    MainButton.Text = "START AUTO COIN"
-    MainButton.Font = Enum.Font.GothamBold
-    MainButton.TextSize = 12
-    MainButton.TextColor3 = Color3.new(1, 1, 1)
-    MainButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    MainButton.Parent = Content
+    -- Height Label
+    local HeightLabel = Instance.new("TextLabel")
+    HeightLabel.Size = UDim2.new(1, -10, 0, 15)
+    HeightLabel.Position = UDim2.new(0, 5, 0, 36)
+    HeightLabel.Text = "Height: 5000"
+    HeightLabel.TextColor3 = THEME.primaryBlue
+    HeightLabel.BackgroundTransparency = 1
+    HeightLabel.Font = Enum.Font.GothamMedium
+    HeightLabel.TextSize = 11
+    HeightLabel.TextXAlignment = Enum.TextXAlignment.Center
+    HeightLabel.Parent = StatusGroup
 
-    local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 6)
-    MainCorner.Parent = MainButton
-
-    -- Toggle Buttons Frame
-    local ToggleFrame = Instance.new("Frame")
-    ToggleFrame.Size = UDim2.new(1, 0, 0, 25)
-    ToggleFrame.Position = UDim2.new(0, 0, 0, 140)
-    ToggleFrame.BackgroundTransparency = 1
-    ToggleFrame.Parent = Content
-
-    -- Auto Win Toggle
-    local WinButton = Instance.new("TextButton")
-    WinButton.Size = UDim2.new(0.48, 0, 1, 0)
-    WinButton.Position = UDim2.new(0, 0, 0, 0)
-    WinButton.Text = "WIN: OFF"
-    WinButton.Font = Enum.Font.Gotham
-    WinButton.TextSize = 11
-    WinButton.TextColor3 = Color3.new(1, 1, 1)
-    WinButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    WinButton.Parent = ToggleFrame
-
-    local WinCorner = Instance.new("UICorner")
-    WinCorner.CornerRadius = UDim.new(0, 6)
-    WinCorner.Parent = WinButton
-
-    -- Auto Token Toggle
-    local TokenButton = Instance.new("TextButton")
-    TokenButton.Size = UDim2.new(0.48, 0, 1, 0)
-    TokenButton.Position = UDim2.new(0.52, 0, 0, 0)
-    TokenButton.Text = "TOKEN: OFF"
-    TokenButton.Font = Enum.Font.Gotham
-    TokenButton.TextSize = 11
-    TokenButton.TextColor3 = Color3.new(1, 1, 1)
-    TokenButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    TokenButton.Parent = ToggleFrame
-
-    local TokenCorner = Instance.new("UICorner")
-    TokenCorner.CornerRadius = UDim.new(0, 6)
-    TokenCorner.Parent = TokenButton
+    -- Separator
+    local Separator = Instance.new("Frame")
+    Separator.Size = UDim2.new(1, -10, 0, 1)
+    Separator.Position = UDim2.new(0, 5, 0, 53)
+    Separator.BackgroundColor3 = THEME.separator
+    Separator.BackgroundTransparency = 0
+    Separator.BorderSizePixel = 0
+    Separator.Parent = StatusGroup
 
     -- Status Message
     local StatusMessage = Instance.new("TextLabel")
-    StatusMessage.Size = UDim2.new(1, 0, 0, 15)
-    StatusMessage.Position = UDim2.new(0, 0, 0, 170)
+    StatusMessage.Size = UDim2.new(1, -10, 0, 15)
+    StatusMessage.Position = UDim2.new(0, 5, 0, 57)
     StatusMessage.Text = "JUMP FROM TOWER FIRST"
-    StatusMessage.TextColor3 = Color3.fromRGB(255, 100, 100)
+    StatusMessage.TextColor3 = THEME.primaryRed
     StatusMessage.BackgroundTransparency = 1
-    StatusMessage.Font = Enum.Font.Gotham
+    StatusMessage.Font = Enum.Font.GothamMedium
     StatusMessage.TextSize = 11
     StatusMessage.TextXAlignment = Enum.TextXAlignment.Center
-    StatusMessage.Parent = Content
+    StatusMessage.Parent = StatusGroup
 
-    -- Store GUI instance untuk validasi
-    State.guiInstance = MainFrame
+    -- ===== CONTROL GROUP =====
+    local ControlGroup = Instance.new("Frame")
+    ControlGroup.Size = UDim2.new(1, 0, 0, 85)
+    ControlGroup.Position = UDim2.new(0, 0, 0, 80)
+    ControlGroup.BackgroundColor3 = THEME.cardBackground
+    ControlGroup.BackgroundTransparency = 0
+    ControlGroup.BorderSizePixel = 0
+    ControlGroup.Parent = Content
 
-    -- Return GUI elements
-    return {
+    local ControlCorner = Instance.new("UICorner")
+    ControlCorner.CornerRadius = UDim.new(0, 8)
+    ControlCorner.Parent = ControlGroup
+
+    local ControlBorder = Instance.new("UIStroke")
+    ControlBorder.Color = THEME.separator
+    ControlBorder.Thickness = 0.5
+    ControlBorder.Parent = ControlGroup
+
+    -- Delay Input
+    local DelayContainer = Instance.new("Frame")
+    DelayContainer.Size = UDim2.new(1, -10, 0, 25)
+    DelayContainer.Position = UDim2.new(0, 5, 0, 2)
+    DelayContainer.BackgroundTransparency = 1
+    DelayContainer.Parent = ControlGroup
+
+    local DelayLabel = Instance.new("TextLabel")
+    DelayLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    DelayLabel.Position = UDim2.new(0, 0, 0, 0)
+    DelayLabel.Text = "Coin Delay"
+    DelayLabel.TextColor3 = THEME.textPrimary
+    DelayLabel.BackgroundTransparency = 1
+    DelayLabel.Font = Enum.Font.GothamMedium
+    DelayLabel.TextSize = 13
+    DelayLabel.TextXAlignment = Enum.TextXAlignment.Left
+    DelayLabel.Parent = DelayContainer
+
+    local DelayBox = Instance.new("TextBox")
+    DelayBox.Size = UDim2.new(0.4, 0, 1, 0)
+    DelayBox.Position = UDim2.new(0.6, 0, 0, 0)
+    DelayBox.Text = tostring(DEFAULT_DELAY)
+    DelayBox.PlaceholderText = "Sec"
+    DelayBox.BackgroundColor3 = THEME.cardBackground
+    DelayBox.TextColor3 = THEME.textPrimary
+    DelayBox.Font = Enum.Font.GothamMedium
+    DelayBox.TextSize = 12
+    DelayBox.TextXAlignment = Enum.TextXAlignment.Center
+    DelayBox.Parent = DelayContainer
+
+    local DelayCorner = Instance.new("UICorner")
+    DelayCorner.CornerRadius = UDim.new(0, 6)
+    DelayCorner.Parent = DelayBox
+
+    local DelayBorder = Instance.new("UIStroke")
+    DelayBorder.Color = THEME.separator
+    DelayBorder.Thickness = 0.5
+    DelayBorder.Parent = DelayBox
+
+    -- Separator
+    local ControlSeparator = Instance.new("Frame")
+    ControlSeparator.Size = UDim2.new(1, -10, 0, 1)
+    ControlSeparator.Position = UDim2.new(0, 5, 0, 29)
+    ControlSeparator.BackgroundColor3 = THEME.separator
+    ControlSeparator.BackgroundTransparency = 0
+    ControlSeparator.BorderSizePixel = 0
+    ControlSeparator.Parent = ControlGroup
+
+    -- Switches Frame
+    local SwitchFrame = Instance.new("Frame")
+    SwitchFrame.Size = UDim2.new(1, -10, 0, 55)
+    SwitchFrame.Position = UDim2.new(0, 5, 0, 32)
+    SwitchFrame.BackgroundTransparency = 1
+    SwitchFrame.Parent = ControlGroup
+
+    local lockSpeedSwitch = CreateiOSSwitch(
+        SwitchFrame,
+        UDim2.new(0, 0, 0, 0),
+        false,
+        "Lock Speed"
+    )
+    
+    local winSwitch = CreateiOSSwitch(
+        SwitchFrame,
+        UDim2.new(0, 0, 0, 15),
+        false,
+        "Auto Win"
+    )
+    
+    local tokenSwitch = CreateiOSSwitch(
+        SwitchFrame,
+        UDim2.new(0, 0, 0, 30),
+        false,
+        "Auto Token"
+    )
+
+    -- ===== MAIN BUTTON =====
+    local MainButton = Instance.new("TextButton")
+    MainButton.Size = UDim2.new(1, 0, 0, 30)
+    MainButton.Position = UDim2.new(0, 0, 0, 173)
+    MainButton.Text = "START AUTO COIN"
+    MainButton.Font = Enum.Font.GothamBold
+    MainButton.TextSize = 12
+    MainButton.TextColor3 = THEME.primaryBlue
+    MainButton.BackgroundColor3 = THEME.cardBackground
+    MainButton.AutoButtonColor = false
+    MainButton.Parent = Content
+
+    local MainCorner = Instance.new("UICorner")
+    MainCorner.CornerRadius = UDim.new(0, 8)
+    MainCorner.Parent = MainButton
+
+    local MainBorder = Instance.new("UIStroke")
+    MainBorder.Color = THEME.separator
+    MainBorder.Thickness = 0.5
+    MainBorder.Parent = MainButton
+
+    local GUI = {
         MainFrame = MainFrame,
         Frame = Frame,
         Content = Content,
-        HeightTextBox = HeightBox,
-        DelayTextBox = DelayBox,
-        StatusLabel = StatusLabel,
-        SpeedLabel = SpeedLabel,
-        StartStopButton = MainButton,
-        AutoWinToggle = WinButton,
-        AutoTokenToggle = TokenButton,
+        CoinLabel = CoinLabel,
+        WinLabel = WinLabel,
+        TokenLabel = TokenLabel,
         StatusMessage = StatusMessage,
+        SpeedLabel = SpeedLabel,
+        HeightLabel = HeightLabel,
+        DelayTextBox = DelayBox,
+        StartStopButton = MainButton,
         MinimizeButton = MinimizeButton,
         CloseButton = CloseButton,
-        LockDelayCheckbox = LockDelayBox,
-        LockDelayLabel = LockDelayLabel
+        TitleText = TitleText,
+        lockSpeedSwitch = lockSpeedSwitch,
+        winSwitch = winSwitch,
+        tokenSwitch = tokenSwitch,
     }
+    
+    return GUI
 end
 
 ------ REMOTE EVENT FUNCTIONS ------
@@ -579,7 +672,7 @@ end
 
 local function SendJumpData()
     if State.jumpID then
-        local height = tonumber(GUI.HeightTextBox.Text) or CalculateHeight()
+        local height = CalculateHeight()  -- ← HANYA BACA delay
         SendRemoteEvent("JumpResults", State.jumpID, height)
     end
 end
@@ -593,7 +686,7 @@ end
 local function SendWinData()
     if State.winID then
         SendRemoteEvent("ClaimRooftopWinsReward", State.winID)
-        State.lastWinTime = os.time()
+        State.lastWinTime = tick()
     end
 end
 
@@ -604,399 +697,147 @@ local function SendTokenData()
 end
 
 ------ CORE LOGIC ------
-local function UpdateStatus()
-    if not GUI or not GUI.StatusLabel then return end
-    
-    local coinIcon = State.jumpID and State.landingID and "●" or "○"
-    local winIcon = State.winID and "●" or "○"
-    local tokenIcon = State.magicTokenID and "●" or "○"
-    local idCount = GetCollectedIDsCount()
-
-    GUI.StatusLabel.Text = string.format("Coin[%s] Win[%s] Token[%s] (%d/4)", coinIcon, winIcon, tokenIcon, idCount)
-
-    local hookStatus = State.hookActive and "ACTIVE" or (State.hookTimedOut and "TIMEOUT" or "STOPPED")
-    local timeElapsed = math.floor(os.time() - State.hookStartTime)
-    local timeDisplay = State.hookActive and string.format(" (%ds/%ds)", timeElapsed, HOOK_TIMEOUT) or ""
-    
-    GUI.SpeedLabel.Text = string.format("Hook: %s%s | Speed: %.2f", hookStatus, timeDisplay, State.climbSpeed)
-
-    if State.jumpID and State.landingID then
-        State.isReady = true
-        GUI.StartStopButton.BackgroundColor3 = State.running and Color3.fromRGB(0, 200, 50) or Color3.fromRGB(70, 140, 80)
-        GUI.StatusMessage.Text = State.running and "RUNNING..." or "READY TO START!"
-        GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-    else
-        State.isReady = false
-        GUI.StartStopButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        GUI.StatusMessage.Text = "JUMP FROM TOWER FIRST"
-        GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 100, 100)
-    end
-end
-
 local function RunLoop()
-    -- Simpan referensi coroutine
-    State.runLoopCoroutine = coroutine.running()
-    
     while State.running and State.hookEnabled do
-        -- Cek apakah GUI masih ada
-        if not State.guiInstance or not State.guiInstance.Parent then
-            print("⚠️ GUI destroyed, stopping run loop...")
-            State.running = false
-            break
-        end
+        -- HANYA BACA delay dari user (TIDAK diubah)
+        local coinDelay = State.coinDelay  -- ← ABSOLUT dari user
         
-        local internalDelay = tonumber(GUI.DelayTextBox.Text) or DEFAULT_DELAY
+        State.lastLoopTime = tick()
+        State.nextLoopTime = State.lastLoopTime + coinDelay
+        State.tokenClaimed = false
 
-        if State.autoTokenEnabled and State.climbSpeed > 0 and not State.lockDelay and State.speedValidated then
-            internalDelay = math.floor((10000 / State.climbSpeed) * 10) / 10
-            GUI.DelayTextBox.Text = string.format("%.1f", internalDelay)
-        end
-
-        State.lastLoopTime = os.time()
-        State.nextLoopTime = State.lastLoopTime + internalDelay
-
+        -- === HANDLE TOKEN (MIDPOINT) ===
+        -- Token di-claim di MIDPOINT dari delay user
         if State.autoTokenEnabled and State.magicTokenID then
-            local tokenTime = State.lastLoopTime + (internalDelay / 2)
-            while os.time() < tokenTime and State.running and State.hookEnabled do
-                if not State.guiInstance or not State.guiInstance.Parent then
-                    State.running = false
-                    break
-                end
+            local tokenTime = State.lastLoopTime + (coinDelay / 2)  -- ← HANYA BACA
+            while tick() < tokenTime and State.running and State.hookEnabled do
+                UpdateStatusBar()
                 task.wait(0.1)
             end
             if State.running and State.hookEnabled then
                 SendTokenData()
+                State.tokenClaimed = true
+                State.tokenClaimTime = tick()
+                
+                GUI.StatusMessage.Text = "✨ TOKEN CLAIMED!"
+                GUI.StatusMessage.TextColor3 = THEME.primaryYellow
+                task.delay(0.5, function()
+                    if State.hookEnabled then
+                        UpdateStatusMessage()
+                    end
+                end)
             end
         end
 
-        local currentWinDelay = GetWinDelay()
-        if State.autoWinEnabled and State.speedValidated and os.time() - State.lastWinTime >= currentWinDelay then
-            SendWinData()
+        -- === HANDLE WIN ===
+        if State.autoWinEnabled and State.winID then
+            local winDelay = State.currentWinDelay
+            if winDelay > 0 and (tick() - State.lastWinTime) >= winDelay then
+                SendWinData()
+                
+                GUI.StatusMessage.Text = "🏆 WIN CLAIMED!"
+                GUI.StatusMessage.TextColor3 = THEME.primaryYellow
+                task.delay(0.5, function()
+                    if State.hookEnabled then
+                        UpdateStatusMessage()
+                    end
+                end)
+            end
         end
 
-        while os.time() < State.nextLoopTime and State.running and State.hookEnabled do
-            if not State.guiInstance or not State.guiInstance.Parent then
-                State.running = false
-                break
-            end
-            
-            local remaining = State.nextLoopTime - os.time()
-            local winRemaining = currentWinDelay - (os.time() - State.lastWinTime)
-            local statusText = string.format("RUNNING (%.1fs)", remaining)
-
-            if State.autoWinEnabled and State.speedValidated then
-                statusText = statusText..string.format(" | WIN (%.1fs)", winRemaining > 0 and winRemaining or 0)
-            end
-
-            GUI.StatusMessage.Text = statusText
+        -- === WAIT REMAINING TIME ===
+        while tick() < State.nextLoopTime and State.running and State.hookEnabled do
+            UpdateStatusBar()
             task.wait(0.1)
         end
 
         if not State.running or not State.hookEnabled then break end
 
+        -- === CLAIM COIN ===
         SendJumpData()
         SendLandingData()
 
-        State.runTime = State.runTime + (os.time() - State.lastLoopTime)
+        -- === AUTO-PAUSE ===
+        State.runTime = State.runTime + (tick() - State.lastLoopTime)
         if State.runTime >= PAUSE_INTERVAL then
             State.running = false
             GUI.StatusMessage.Text = "PAUSING FOR 30 SECONDS..."
+            GUI.StatusMessage.TextColor3 = THEME.primaryYellow
             task.wait(PAUSE_DURATION)
             State.runTime = 0
             State.running = true
+            UpdateStatusMessage()
         end
     end
 
-    if State.hookEnabled and State.guiInstance and State.guiInstance.Parent then
+    if State.hookEnabled then
         UpdateStatus()
     end
-    
-    State.runLoopCoroutine = nil
 end
 
------- OPTIMIZED CLIMB SPEED METER ------
-local function StopSpeedDetection()
-    State.speedDetectionActive = false
-    
-    for _, connection in ipairs(State.speedDetectionConnections) do
-        if connection and connection.Disconnect then
-            connection:Disconnect()
-        end
-    end
-    State.speedDetectionConnections = {}
-    
-    print("Speed detection stopped - measurement complete")
-end
-
+------ CLIMB SPEED METER LOGIC ------
 local function SetupCharacter(char)
-    if not State.speedDetectionActive then
-        if GUI and GUI.SpeedLabel then
-            GUI.SpeedLabel.Text = string.format("Speed: %.2f studs/s (Locked)", State.climbSpeed)
-        end
-        return
-    end
-    
     local humanoid = char:WaitForChild("Humanoid")
-    local humanoidRootPart = char:WaitForChild("HumanoidRootPart")
-    local connections = {}
     
-    local isClimbing = false
-    local maxY = 0
-    local climbStartY = 0
     local climbStartTime = 0
-    local frameCounter = 0
+    local climbStartY = 0
+    local maxY = 0
+    local isClimbing = false
 
-    local stateChangedConnection = humanoid.StateChanged:Connect(function(_, new)
-        if not State.speedDetectionActive then
-            return
-        end
-        
+    humanoid.StateChanged:Connect(function(_, new)
         if new == Enum.HumanoidStateType.Climbing then
-            State.speedValidated = false
-            State.speedMeasurementTime = 0
-            isClimbing = true
-            climbStartY = humanoidRootPart.Position.Y
             climbStartTime = tick()
+            climbStartY = char:WaitForChild("HumanoidRootPart").Position.Y
             maxY = climbStartY
+            isClimbing = true
             State.climbing = true
-            if GUI and GUI.SpeedLabel then
-                GUI.SpeedLabel.Text = "Speed: Measuring..."
-            end
+            State.climbStartY = climbStartY
+            State.climbStartTime = climbStartTime
+            State.maxY = maxY
         else
             if isClimbing then
                 local climbEndY = maxY
                 local climbEndTime = tick()
                 local totalY = climbEndY - climbStartY
                 local totalTime = climbEndTime - climbStartTime
-
-                if totalY > 0 and totalTime > 0 then
-                    if totalTime >= MIN_SPEED_MEASUREMENT then
-                        State.climbSpeed = totalY / totalTime
-                        State.speedValidated = true
-                        State.speedMeasurementTime = totalTime
-                        
-                        if GUI and GUI.SpeedLabel then
-                            GUI.SpeedLabel.Text = string.format("Speed: %.2f studs/s ✓ (Valid)", State.climbSpeed)
-                        end
-                        if GUI and GUI.StatusMessage then
-                            GUI.StatusMessage.Text = string.format("✓ SPEED VALIDATED! (%.1fs) - DETECTION STOPPED", totalTime)
-                            GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-                        end
-                        task.wait(1.5)
-
-                        StopSpeedDetection()
-
-                        if not State.lockDelay then
-                            UpdateHeight()
-                            if State.autoTokenEnabled then
-                                local newDelay = math.floor((10000 / State.climbSpeed) * 10) / 10
-                                if GUI and GUI.DelayTextBox then
-                                    GUI.DelayTextBox.Text = string.format("%.1f", newDelay)
-                                end
-                            end
-                        end
-
-                        if State.autoWinEnabled and GUI and GUI.StatusMessage then
-                            GUI.StatusMessage.Text = string.format("WIN DELAY: %.1fs", GetWinDelay())
-                            task.wait(2)
-                            if State.running then
-                                GUI.StatusMessage.Text = "RUNNING..."
-                            end
-                        end
-                    else
-                        State.climbSpeed = totalY / totalTime
-                        State.speedValidated = false
-                        
-                        if GUI and GUI.SpeedLabel then
-                            GUI.SpeedLabel.Text = string.format("Speed: %.2f studs/s ✗ (INVALID - %.1fs)", State.climbSpeed, totalTime)
-                        end
-                        if GUI and GUI.StatusMessage then
-                            GUI.StatusMessage.Text = "✗ SPEED MEASUREMENT TOO SHORT! (>3s needed)"
-                            GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 100, 100)
-                        end
-                        task.wait(2)
-                        
-                        if State.running and GUI and GUI.StatusMessage then
-                            GUI.StatusMessage.Text = "RUNNING... (USE PREVIOUS SPEED)"
-                        else
-                            UpdateStatus()
-                        end
+                
+                if totalY > 0 and totalTime > MIN_CLIMB_DURATION then
+                    State.climbSpeed = totalY / totalTime
+                    GUI.SpeedLabel.Text = string.format("Speed: %.2f studs/s", State.climbSpeed)
+                    
+                    if not State.lockSpeed then
+                        -- Height diupdate otomatis dari delay (SATU ARAH)
+                        UpdateHeight()
+                        -- Update delays untuk display cooldown saja (TIDAK mengubah coinDelay)
+                        UpdateDelays()
                     end
                 else
-                    if GUI and GUI.SpeedLabel then
-                        GUI.SpeedLabel.Text = "Speed: 0 studs/s"
+                    if totalTime > 0 and totalTime <= MIN_CLIMB_DURATION then
+                        GUI.StatusMessage.Text = "CLIMB LONGER (>2s)"
+                        GUI.StatusMessage.TextColor3 = THEME.primaryYellow
+                        task.delay(1.5, function()
+                            if State.hookEnabled then
+                                UpdateStatusMessage()
+                            end
+                        end)
                     end
                 end
+                
                 isClimbing = false
                 State.climbing = false
             end
         end
     end)
-    table.insert(connections, stateChangedConnection)
 
-    local heartbeatConnection = RunService.Heartbeat:Connect(function()
-        if not State.speedDetectionActive or not isClimbing then
-            return
-        end
-        
-        frameCounter = frameCounter + 1
-        if frameCounter % HEARTBEAT_INTERVAL == 0 then
-            local currentY = humanoidRootPart.Position.Y
-            if currentY > maxY then
-                maxY = currentY
+    RunService.Heartbeat:Connect(function()
+        if isClimbing and char:FindFirstChild("HumanoidRootPart") then
+            local y = char.HumanoidRootPart.Position.Y
+            if y > maxY then
+                maxY = y
+                State.maxY = maxY
             end
         end
     end)
-    table.insert(connections, heartbeatConnection)
-
-    State.speedDetectionConnections = connections
-end
-
------- OPTIMIZED HOOK WITH TIMEOUT ------
-local function StopHook(reason)
-    if State.hookActive then
-        State.hookActive = false
-        
-        if State.hookCleanup then
-            State.hookCleanup()
-            State.hookCleanup = nil
-        end
-        
-        local message = ""
-        if reason == "complete" then
-            message = "✓ ALL IDs COLLECTED! HOOK STOPPED"
-            print("Hook stopped - all IDs collected!")
-        elseif reason == "timeout" then
-            State.hookTimedOut = true
-            local collected = GetCollectedIDsCount()
-            message = string.format("⏰ HOOK TIMEOUT! (%d/4 IDs collected)", collected)
-            print(string.format("Hook stopped - timeout! (%d/4 IDs collected)", collected))
-        end
-        
-        if GUI and GUI.StatusMessage then
-            GUI.StatusMessage.Text = message
-            GUI.StatusMessage.TextColor3 = reason == "complete" and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 200, 0)
-        end
-        task.wait(2)
-        UpdateStatus()
-    end
-end
-
-local function StartTimeoutTimer()
-    coroutine.wrap(function()
-        local startTime = os.time()
-        State.hookStartTime = startTime
-        
-        while State.hookActive do
-            -- Cek apakah GUI masih ada
-            if not State.guiInstance or not State.guiInstance.Parent then
-                print("⚠️ GUI destroyed, stopping timeout timer...")
-                break
-            end
-            
-            local elapsed = os.time() - startTime
-            
-            if elapsed % 5 == 0 then
-                local remaining = HOOK_TIMEOUT - elapsed
-                if remaining > 0 and GUI and GUI.StatusMessage then
-                    GUI.StatusMessage.Text = string.format("⏳ Collecting IDs... (%ds remaining)", remaining)
-                    GUI.StatusMessage.TextColor3 = Color3.fromRGB(255, 200, 100)
-                end
-            end
-            
-            if elapsed >= HOOK_TIMEOUT then
-                if State.hookActive then
-                    print("⚠️ HOOK TIMEOUT! Stopping hook...")
-                    StopHook("timeout")
-                end
-                break
-            end
-            
-            task.wait(1)
-        end
-    end)()
-end
-
-local function InitializeRemoteHook()
-    local remoteEvent = ReplicatedStorage:WaitForChild("ProMgs"):WaitForChild("RemoteEvent")
-    local oldNamecall
-    local isHooked = false
-
-    State.hookCleanup = function()
-        if isHooked and oldNamecall then
-            local success, err = pcall(function()
-                hookmetamethod(game, "__namecall", oldNamecall)
-            end)
-            if not success then
-                warn("Failed to unhook: " .. tostring(err))
-            end
-            isHooked = false
-            print("Hook successfully removed")
-        end
-    end
-
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        if not State.hookActive then
-            return oldNamecall(self, ...)
-        end
-
-        if self == remoteEvent then
-            local method = getnamecallmethod()
-            if method == "FireServer" then
-                local args = {...}
-                local eventType = args[1]
-                local eventID = args[2]
-
-                if typeof(eventID) == "number" then
-                    local idCollected = false
-                    
-                    if eventType == "JumpResults" then
-                        if State.jumpID == nil then
-                            State.jumpID = eventID
-                            idCollected = true
-                            print(string.format("✓ Jump ID collected: %d", eventID))
-                        end
-                    elseif eventType == "LandingResults" then
-                        if State.landingID == nil then
-                            State.landingID = eventID
-                            idCollected = true
-                            print(string.format("✓ Landing ID collected: %d", eventID))
-                        end
-                    elseif eventType == "ClaimRooftopWinsReward" then
-                        if State.winID == nil then
-                            State.winID = eventID
-                            idCollected = true
-                            print(string.format("✓ Win ID collected: %d", eventID))
-                        end
-                    elseif eventType == "ClaimRooftopMagicToken" then
-                        if State.magicTokenID == nil then
-                            State.magicTokenID = eventID
-                            idCollected = true
-                            print(string.format("✓ Token ID collected: %d", eventID))
-                        end
-                    end
-
-                    if idCollected then
-                        UpdateStatus()
-                        print(string.format("Progress: %d/4 IDs collected", GetCollectedIDsCount()))
-                    end
-
-                    if CheckAllIDsCollected() then
-                        print("🎯 All IDs collected! Stopping hook...")
-                        StopHook("complete")
-                    end
-                end
-            end
-        end
-
-        return oldNamecall(self, ...)
-    end)
-
-    isHooked = true
-    State.hookStartTime = os.time()
-    print(string.format("Hook initialized - waiting for IDs... (timeout: %d seconds)", HOOK_TIMEOUT))
-    
-    StartTimeoutTimer()
 end
 
 ------ EVENT HANDLERS ------
@@ -1005,166 +846,225 @@ local function InitializeEventHandlers()
         if State.isReady then
             State.running = not State.running
             if State.running then
-                GUI.StartStopButton.Text = "AUTO COIN ON"
-                GUI.StartStopButton.BackgroundColor3 = Color3.fromRGB(0, 200, 50)
-                State.lastWinTime = os.time()
+                State.lastWinTime = tick()
                 coroutine.wrap(RunLoop)()
-            else
-                GUI.StartStopButton.Text = "START AUTO COIN"
-                GUI.StartStopButton.BackgroundColor3 = Color3.fromRGB(70, 140, 80)
-                UpdateStatus()
             end
+            UpdateStatus()
         end
     end)
 
-    GUI.AutoWinToggle.MouseButton1Click:Connect(function()
-        if State.winID then
-            State.autoWinEnabled = not State.autoWinEnabled
-            if State.autoWinEnabled then
-                GUI.AutoWinToggle.Text = "WIN: ON"
-                GUI.AutoWinToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-                State.lastWinTime = os.time()
-                if State.climbSpeed > 0 and State.speedValidated then
-                    GUI.StatusMessage.Text = string.format("WIN DELAY: %.1fs", GetWinDelay())
-                    task.wait(2)
-                    if State.running then
-                        GUI.StatusMessage.Text = "RUNNING..."
-                    end
-                end
-            else
-                GUI.AutoWinToggle.Text = "WIN: OFF"
-                GUI.AutoWinToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-            end
+    GUI.StartStopButton.MouseEnter:Connect(function()
+        if not State.running then            GUI.StartStopButton.BackgroundColor3 = THEME.buttonHover
+        end
+    end)
+    GUI.StartStopButton.MouseLeave:Connect(function()
+        if not State.running then
+            GUI.StartStopButton.BackgroundColor3 = THEME.cardBackground
         end
     end)
 
-    GUI.AutoTokenToggle.MouseButton1Click:Connect(function()
-        if State.magicTokenID then
-            State.autoTokenEnabled = not State.autoTokenEnabled
-            if State.autoTokenEnabled then
-                GUI.AutoTokenToggle.Text = "TOKEN: ON"
-                GUI.AutoTokenToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-                if State.climbSpeed > 0 and not State.lockDelay and State.speedValidated then
-                    local newDelay = math.floor((10000 / State.climbSpeed) * 10) / 10
-                    GUI.DelayTextBox.Text = string.format("%.1f", newDelay)
-                end
-            else
-                GUI.AutoTokenToggle.Text = "TOKEN: OFF"
-                GUI.AutoTokenToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-            end
-        end
-    end)
-
-    GUI.LockDelayCheckbox.MouseButton1Click:Connect(function()
-        State.lockDelay = not State.lockDelay
-        if State.lockDelay then
-            GUI.LockDelayCheckbox.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-            GUI.DelayTextBox.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-            GUI.DelayTextBox.TextEditable = false
-            GUI.StatusMessage.Text = "DELAY LOCKED"
-            GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-            task.wait(1.5)
-            if State.running then
-                GUI.StatusMessage.Text = "RUNNING..."
-            else
-                UpdateStatus()
-            end
+    GUI.lockSpeedSwitch.onChange(function(isOn)
+        State.lockSpeed = isOn
+        if isOn then
+            ShowTemporaryMessage("SPEED LOCKED", THEME.ledGreen, 1.5)
         else
-            GUI.LockDelayCheckbox.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-            GUI.DelayTextBox.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-            GUI.DelayTextBox.TextEditable = true
-            GUI.StatusMessage.Text = "DELAY UNLOCKED"
-            GUI.StatusMessage.TextColor3 = Color3.fromRGB(100, 255, 100)
-            task.wait(1.5)
-            if State.running then
-                GUI.StatusMessage.Text = "RUNNING..."
-            else
-                UpdateStatus()
-            end
+            ShowTemporaryMessage("SPEED UNLOCKED", THEME.textSecondary, 1.5)
         end
     end)
 
+    -- Auto Win Switch
+    GUI.winSwitch.onChange(function(isOn)
+        State.autoWinEnabled = isOn
+        if State.winID then
+            if isOn then
+                State.lastWinTime = tick()
+                UpdateDelays()
+            end
+            UpdateStatusBar()
+        else
+            task.wait(0.1)
+            GUI.winSwitch.setOn(false)
+            State.autoWinEnabled = false
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "⚠️ Auto Win",
+                Text = "Claim win reward first!",
+                Duration = 2
+            })
+        end
+    end)
+
+    -- Auto Token Switch
+    GUI.tokenSwitch.onChange(function(isOn)
+        if State.magicTokenID then
+            State.autoTokenEnabled = isOn
+            if isOn then
+                UpdateDelays()
+            end
+            UpdateStatusBar()
+        else
+            task.wait(0.1)
+            GUI.tokenSwitch.setOn(false)
+            State.autoTokenEnabled = false
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "⚠️ Auto Token",
+                Text = "Claim magic token first!",
+                Duration = 2
+            })
+        end
+    end)
+
+    -- Delay Box: HANYA baca input user, tidak ada yang mengubah selain user
     GUI.DelayTextBox:GetPropertyChangedSignal("Text"):Connect(function()
-        if State.climbSpeed > 0 and not State.lockDelay and State.speedValidated then
-            UpdateHeight()
+        if not State.lockSpeed then
+            UpdateDelays()
+            if State.climbSpeed > 0 then
+                UpdateHeight()  -- Height otomatis dari delay
+            end
         end
     end)
 
     GUI.MinimizeButton.MouseButton1Click:Connect(function()
         State.minimized = not State.minimized
         if State.minimized then
-            GUI.Frame.Size = UDim2.new(0, 100, 0, 25)
+            GUI.Frame.Size = UDim2.new(0, 100, 0, 32)
             GUI.MinimizeButton.Text = "+"
             GUI.Content.Visible = false
-            GUI.StatusMessage.Visible = false
             GUI.TitleText.Position = UDim2.new(0.5, -25, 0, 0)
             GUI.TitleText.TextXAlignment = Enum.TextXAlignment.Center
         else
-            GUI.Frame.Size = UDim2.new(0, 200, 0, 200)
-            GUI.MinimizeButton.Text = "-"
+            GUI.Frame.Size = UDim2.new(0, 200, 0, 245)
+            GUI.MinimizeButton.Text = "−"
             GUI.Content.Visible = true
-            GUI.StatusMessage.Visible = true
             GUI.TitleText.Position = UDim2.new(0.15, 0, 0, 0)
             GUI.TitleText.TextXAlignment = Enum.TextXAlignment.Left
         end
     end)
 
-    -- Close Button dengan safe destroy
     GUI.CloseButton.MouseButton1Click:Connect(function()
-        SafeDestroyGUI()
+        State.hookEnabled = false
+        GUI.MainFrame:Destroy()
+    end)
+
+    GUI.CloseButton.MouseEnter:Connect(function()
+        GUI.CloseButton.BackgroundColor3 = Color3.fromRGB(255, 80, 70)
+    end)
+    GUI.CloseButton.MouseLeave:Connect(function()
+        GUI.CloseButton.BackgroundColor3 = THEME.primaryRed
+    end)
+
+    GUI.MinimizeButton.MouseEnter:Connect(function()
+        GUI.MinimizeButton.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+    end)
+    GUI.MinimizeButton.MouseLeave:Connect(function()
+        GUI.MinimizeButton.BackgroundColor3 = THEME.primaryYellow
     end)
 end
 
------- VALIDATION FUNCTIONS ------
-local function IsGUIActive()
-    return State.guiInstance ~= nil and State.guiInstance.Parent ~= nil
+------ REMOTE EVENT HOOK ------
+local function InitializeRemoteHook()
+    local remoteEvent = ReplicatedStorage:WaitForChild("ProMgs"):WaitForChild("RemoteEvent")
+    local oldNamecall
+
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        if not State.hookEnabled then
+            return oldNamecall(self, ...)
+        end
+
+        local args = {...}
+        local method = getnamecallmethod()
+
+        if self == remoteEvent and method == "FireServer" then
+            local eventType = args[1]
+            local eventID = args[2]
+
+            if typeof(eventID) == "number" then
+                if eventType == "JumpResults" then
+                    State.jumpID = eventID
+                    UpdateStatus()
+                elseif eventType == "LandingResults" then
+                    State.landingID = eventID
+                    UpdateStatus()
+                elseif eventType == "ClaimRooftopWinsReward" then
+                    State.winID = eventID
+                    UpdateStatus()
+                elseif eventType == "ClaimRooftopMagicToken" then
+                    State.magicTokenID = eventID
+                    UpdateStatus()
+                end
+            end
+        end
+
+        return oldNamecall(self, ...)
+    end)
 end
 
-local function IsAllProcessesStopped()
-    return not State.running and 
-           not State.hookActive and 
-           not State.speedDetectionActive and 
-           not State.hookEnabled
+------ DRAGGING SYSTEM ------
+local function SetupDragging()
+    local frame = GUI.Frame
+    local isDragging = false
+    local dragStartPos = nil
+    local frameStartPos = nil
+    local dragInput = nil
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isDragging = true
+            dragStartPos = input.Position
+            frameStartPos = frame.Position
+            dragInput = input
+        end
+    end)
+
+    frame.InputEnded:Connect(function(input)
+        if input == dragInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isDragging = false
+            dragInput = nil
+        end
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if isDragging then
+            local mousePos = UserInputService:GetMouseLocation()
+            if dragStartPos then
+                local delta = mousePos - dragStartPos
+                local newX = frameStartPos.X.Offset + delta.X
+                local newY = frameStartPos.Y.Offset + delta.Y
+                frame.Position = UDim2.new(0, newX, 0, newY)
+            end
+        end
+    end)
+end
+
+------ ANIMATION ------
+local function SetupAnimation()
+    local frame = GUI.Frame
+    frame.Size = UDim2.new(0, 0, 0, 0)
+    frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    task.delay(0.1, function()
+        TweenService:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 200, 0, 245),
+            Position = UDim2.new(0.5, -100, 0.5, -122.5)
+        }):Play()
+    end)
 end
 
 ------ INITIALIZATION ------
-print("=========================================")
-print("AUTO COIN V3 - Initializing...")
+print("=== AUTO COIN V4 STARTING ===")
 
--- Cek dan destroy existing GUI dengan safe method
-if IsGUIExists() then
-    print("⚠️ Existing GUI detected! Removing with safe method...")
-    SafeDestroyGUI()
-end
-
--- Create GUI
 GUI = CreateGUI()
-print("✓ GUI Created Successfully")
 
--- Initialize components
 InitializeEventHandlers()
-print("✓ Event Handlers Initialized")
-
 InitializeRemoteHook()
-print("✓ Remote Hook Initialized")
+SetupDragging()
+SetupAnimation()
 
--- Setup character
 local LocalPlayer = Players.LocalPlayer
 if LocalPlayer.Character then
     SetupCharacter(LocalPlayer.Character)
 end
-LocalPlayer.CharacterAdded:Connect(function(char)
-    State.speedDetectionActive = true
-    State.speedValidated = false
-    SetupCharacter(char)
-end)
+LocalPlayer.CharacterAdded:Connect(SetupCharacter)
 
-print("=========================================")
-print("AUTO COIN V3 - Enhanced Version Loaded!")
-print(string.format("✓ Speed validation: %d seconds minimum", MIN_SPEED_MEASUREMENT))
-print(string.format("✓ CPU Optimization: Heartbeat interval = %d frames", HEARTBEAT_INTERVAL))
-print(string.format("✓ Hook timeout: %d seconds (%d minutes)", HOOK_TIMEOUT, HOOK_TIMEOUT/60))
-print("✓ Hook stops when: All 4 IDs collected OR Timeout")
-print("✓ GUI Validation: Active - prevents duplicate GUI")
-print("✓ Safe Destruction: All scripts stopped before GUI destroy")
-print("=========================================")
+UpdateDelays()
+UpdateStatus()
+
+print("=== AUTO COIN V4 LOADED SUCCESSFULLY ===")
