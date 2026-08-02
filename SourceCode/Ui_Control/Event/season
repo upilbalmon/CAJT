@@ -1,0 +1,802 @@
+local v_u_1 = {}
+local v2 = game:GetService("ReplicatedStorage")
+require(v2.ConfigInstance)
+local v_u_3 = require(v2.Tool.CfgFind)
+local v_u_4 = v_u_3.GetCfgByName("seasonConf")
+local v_u_5 = require(v2.Tool.MathMgr)
+require(v2.Tool.Copy)
+local v_u_6 = require(v2.Tool.Viewport)
+local v_u_7 = require(v2.Tool.EnumMgr)
+local v8 = require(v2.Tool.AddListen)
+require(v2.System.SystemBuyRoblox)
+require(v2.Tool.Log)
+require(v2.Tool.TipsModule)
+local v_u_9 = require(v2.Tool.GetData)
+local v_u_10 = require(v2.Tool.UIMgr)
+local v_u_11 = v2.ServerMsg.DelRedPoint
+local v_u_12 = require(v2.Tool.GradientsMgr)
+local v_u_13 = require(v2.Tool.Viewport)
+local v_u_14 = v2.Msg.RemoteFunction
+local v_u_15 = require(v2:WaitForChild("Tool"):WaitForChild("UIanima"))
+game:GetService("Debris")
+local v16 = script.Parent
+local v17 = v2.GlobalConfig
+local v18 = require(v17.ConfigModule)
+local v_u_19 = game.Players.LocalPlayer
+local v_u_20 = v_u_19:WaitForChild("Bag")
+local v_u_21 = v16.Frame.PremiumPass
+local v_u_22 = v16.Frame.Rewards
+local v_u_23 = v16.Frame.Task
+local v_u_24 = v16.Frame.LuckHatch
+local v_u_25 = v_u_22.ScrollAward
+local v_u_26 = v_u_23.TaskPanel
+local v_u_27 = v_u_23.ScrollingDFrame
+local v_u_28 = v_u_23.ScrollingWFrame
+local v_u_29 = v_u_23.TitleD
+local v_u_30 = v_u_23.TitleW
+local v_u_31 = v_u_23.SwitchBtn
+local v32 = v_u_25.Progress2.XinXin
+local v33 = v_u_20:WaitForChild(v_u_7.ItemID.SeasonExp, (1 / 0))
+local v_u_34 = v_u_20:WaitForChild(v_u_7.ItemID.SeasonLevel, (1 / 0))
+v8.AddMouseCLick(v_u_31.Button, function()
+    -- upvalues: (copy) v_u_26
+    v_u_26.Value = v_u_26.Value == 1 and 2 or 1
+end, v_u_31)
+v8.NumValueAdd(v_u_26, function(p35)
+    -- upvalues: (copy) v_u_27, (copy) v_u_28, (copy) v_u_29, (copy) v_u_30, (copy) v_u_31
+    v_u_27.Visible = p35 == 1
+    v_u_28.Visible = p35 == 2
+    v_u_29.Visible = p35 == 1
+    v_u_30.Visible = p35 == 2
+    v_u_31.BtnStr.Text = p35 == 1 and "WEEKLY>" or "<DAILY"
+end)
+local v_u_36 = v16.Frame.CurPanel
+local v37 = v16.Frame.ListBtn
+local v_u_38 = {
+    ["PremiumPass"] = v37.PremiumPass,
+    ["Rewards"] = v37.Rewards,
+    ["Task"] = v37.Task,
+    ["LuckHatch"] = v37.LuckHatch
+}
+v8.NumValueAdd(v_u_36, function(p39)
+    -- upvalues: (copy) v_u_21, (copy) v_u_23, (copy) v_u_22, (copy) v_u_24, (copy) v_u_38
+    v_u_21.Visible = p39 == "PremiumPass"
+    v_u_23.Visible = p39 == "Task"
+    v_u_22.Visible = p39 == "Rewards"
+    v_u_24.Visible = p39 == "LuckHatch"
+    for v40, v41 in pairs(v_u_38) do
+        local v42 = v41.BG
+        local v43 = v41.Choose
+        local v44 = v41.IconName
+        v42.Visible = v40 ~= p39
+        v43.Visible = v40 == p39
+        v44.UIStroke.Color = v40 == p39 and Color3.fromHex("#004db0") or Color3.fromHex("#000000")
+    end
+end)
+local v45 = v16.BG.Exit.Button
+v8.AddMouseCLick(v45, function()
+    -- upvalues: (copy) v_u_1
+    v_u_1:closeUi()
+end, v16.BG.Exit)
+local _ = v2.GlobalConfig.Season.Vs.Value
+v16.BG.Title["\230\160\135\233\162\152\232\139\177\230\150\135"].Text = "St. Patrick\'s Season"
+v_u_19:WaitForChild("SeasonResetTime")
+local v46 = v_u_25.Free.Temp
+local v47 = v_u_25.Premium.Temp
+local v48 = v32.XinXinIcon
+local v49 = 1
+local function v52(p50, p51) -- name: specialPetSHow
+    p51.ViewportFrame.Visible = false
+    p51.Icon.Visible = true
+    if p50 == 52101668 then
+        p51.Icon.Image = "rbxassetid://122631034081928"
+        p51.Icon.Size = UDim2.new(1, 0, 1, 0)
+        return
+    elseif p50 == 52101667 then
+        p51.Icon.Image = "rbxassetid://101984748851090"
+        return
+    elseif p50 == 52101666 then
+        p51.Icon.Image = "rbxassetid://95986146871267"
+        return
+    elseif p50 == 52101665 then
+        p51.Icon.Image = "rbxassetid://73958826178973"
+    elseif p50 == 52101664 then
+        p51.Icon.Image = "rbxassetid://98247749640348"
+    end
+end
+local function v_u_71()
+    -- upvalues: (copy) v_u_20, (copy) v_u_7, (copy) v_u_4, (copy) v_u_22, (copy) v_u_25
+    local v53 = v_u_20:FindFirstChild(v_u_7.ItemID.SeasonExp)
+    local v54 = v_u_20:FindFirstChild(v_u_7.ItemID.SeasonLevel)
+    local v55 = v_u_4[v54.Value + 1]
+    local v56 = v53.Value
+    local v57 = v_u_22.Progress.Frame.Progress.Container
+    local v58 = v_u_22.Progress.Frame.Progress.ProgressLabel
+    local v59 = v_u_25.Progress2.Frame.Progress.Container
+    local v60 = v_u_22.Progress.ImageLabel["\231\173\137\231\186\167"]
+    local v61 = v54.Value
+    local v62 = #v_u_4
+    v60.Text = math.min(v61, v62)
+    if v55 then
+        local v63 = v56 / v55.Exp
+        local v64 = math.min(1, v63)
+        local v65 = math.max(0.07, v64)
+        v57.Size = UDim2.new(v65, 0, 1, 0)
+        v58.Text = v56 .. "/" .. v55.Exp
+        local v66 = UDim2.new
+        local v67 = v54.Value / #v_u_4
+        v59.Size = v66(math.min(1, v67), 0, 1, 0)
+    else
+        local v68 = v_u_4[#v_u_4].Exp
+        local v69 = v56 / v68
+        local v70 = math.min(1, v69)
+        v57.Size = UDim2.new(math.max(0.07, v70), 0, 1, 0)
+        v58.Text = math.min(v56, v68) .. "/" .. v68
+        v59.Size = UDim2.new(1, 0, 1, 0)
+    end
+    if v54.Value == #v_u_4 then
+        v59.Parent.Size = UDim2.new(1, 0, 1, -5)
+    end
+end
+for v_u_72, v73 in pairs(v_u_4) do
+    v49 = v49 + 1
+    local v74, v75
+    if v_u_72 == 1 then
+        v74 = v46
+        v75 = v47
+    else
+        v74 = v46:Clone()
+        v75 = v47:Clone()
+        v74.Parent = v_u_25.Free
+        v75.Parent = v_u_25.Premium
+    end
+    v74.LayoutOrder = v_u_72 + 1
+    local v76 = v_u_3.FindCfgByID(v73.AwardID[1])
+    if v76 then
+        v_u_10.SetDetail(v74, v73.AwardID[1])
+    end
+    if v76 and v76.tp == v_u_7.ItemType.Pet then
+        v_u_6.createViewPort(v74.ViewportFrame, v73.AwardID[1])
+        v74.ViewportFrame.Visible = true
+        v74.Icon.Visible = false
+        v52(v73.AwardID[1], v74)
+    elseif v76 and v76.tp == v_u_7.ItemType.Egg then
+        v_u_6.createViewPort(v74.ViewportFrame, v73.AwardID[1], v_u_7.ItemType.Egg)
+        v74.ViewportFrame.Visible = true
+        v74.Icon.Visible = false
+    elseif v76 then
+        v74.ViewportFrame.Visible = false
+        v74.Icon.Visible = true
+        if v76 and (v76.Icon and v76.Icon ~= "") then
+            v74.Icon.Image = "rbxassetid://" .. v76.Icon
+        elseif v76.tp == v_u_7.ItemType.Coach then
+            v_u_6.createViewPort(v74.ViewportFrame, v73.AwardID[1], v_u_7.ItemType.Coach)
+            v74.ViewportFrame.Visible = true
+            v74.Icon.Visible = false
+        end
+    else
+        v74.ViewportFrame.Visible = false
+        v74.Icon.Visible = false
+    end
+    if v76 then
+        v74.itemName.Visible = true
+        v74.itemName.Text = v76.ZhName
+    else
+        v74.itemName.Visible = false
+    end
+    if v73.CountID[1] and v73.CountID[1] > 1 then
+        v74.Count.Visible = true
+        v74.Count.Text = "x" .. v73.CountID[1]
+        if v73.AwardID[1] == v_u_7.ItemID.Coin then
+            v74.Count.Text = "x" .. v_u_5.getNumStr(v_u_9.GetCoinAfterWorld(v_u_19, v73.CountID[1]))
+        else
+            v74.Count.Text = "x" .. v_u_5.getNumStr(v73.CountID[1])
+        end
+    else
+        v74.Count.Visible = false
+    end
+    local v77 = v_u_3.FindCfgByID(v73.PayAwardID[1])
+    if v76 then
+        v_u_10.SetDetail(v75, v73.PayAwardID[1])
+    end
+    if v77 and v77.tp == v_u_7.ItemType.Mount then
+        v75.ViewportFrame.Visible = false
+        v75.Icon.Visible = true
+        if v77 and v77.Icon then
+            v75.Icon.Image = "rbxassetid://" .. v77.Icon
+        end
+    elseif v77 and v77.tp == v_u_7.ItemType.Pet then
+        v_u_6.createViewPort(v75.ViewportFrame, v73.PayAwardID[1])
+        v75.ViewportFrame.Visible = true
+        v75.Icon.Visible = false
+        v52(v73.PayAwardID[1], v75)
+    elseif v77 and v77.tp == v_u_7.ItemType.Egg then
+        v_u_6.createViewPort(v75.ViewportFrame, v73.PayAwardID[1], v_u_7.ItemType.Egg)
+        v75.ViewportFrame.Visible = true
+        v75.Icon.Visible = false
+    elseif v77 then
+        v75.ViewportFrame.Visible = false
+        if v77 and (v77.Icon and v77.Icon ~= "") then
+            v75.Icon.Image = "rbxassetid://" .. v77.Icon
+            v75.Icon.Visible = true
+            if v73.PayAwardID[1] == 18000018 then
+                v75.Icon.Size = UDim2.new(1, 0, 1, 0)
+            end
+        elseif v77.tp == v_u_7.ItemType.Coach then
+            v_u_6.createViewPort(v75.ViewportFrame, v73.PayAwardID[1], v_u_7.ItemType.Coach)
+            v75.ViewportFrame.Visible = true
+            v75.Icon.Visible = false
+        end
+    else
+        v75.ViewportFrame.Visible = false
+        v75.Icon.Visible = false
+    end
+    if v77 then
+        v75.itemName.Visible = true
+        v75.itemName.Text = v77.ZhName
+    else
+        v75.itemName.Visible = false
+    end
+    if v73.PayCountID[1] and v73.PayCountID[1] > 1 then
+        v75.Count.Visible = true
+        v75.Count.Text = "x" .. v73.PayCountID[1]
+        if v73.PayAwardID[1] == v_u_7.ItemID.Coin then
+            v75.Count.Text = "x" .. v_u_5.getNumStr(v_u_9.GetCoinAfterWorld(v_u_19, v73.PayCountID[1]))
+        else
+            v75.Count.Text = "x" .. v_u_5.getNumStr(v73.PayCountID[1])
+        end
+    else
+        v75.Count.Visible = false
+    end
+    v8.AddMouseCLick(v74.ClaimBtn.Button, function()
+        -- upvalues: (copy) v_u_72, (copy) v_u_14
+        v_u_14:InvokeServer("ClaimOnceSeasonAward", { v_u_72, false })
+    end, v74.ClaimBtn)
+    v8.AddMouseCLick(v75.ClaimBtn.Button, function()
+        -- upvalues: (copy) v_u_9, (copy) v_u_19, (copy) v_u_7, (copy) v_u_36, (copy) v_u_72, (copy) v_u_14
+        local v78 = v_u_9.CheckIsBuyRegular(v_u_19, v_u_7.ItemID.SeasonCard)
+        if v78 == false then
+            v78 = v_u_9.CheckIsBuyPremium(v_u_19, v_u_7.ItemID.SeasonAdvanced)
+        end
+        if v78 == false then
+            v_u_36.Value = "PremiumPass"
+        end
+        v_u_14:InvokeServer("ClaimOnceSeasonAward", { v_u_72, true })
+    end, v75.ClaimBtn)
+    v74.Name = tonumber(v_u_72)
+    v75.Name = tonumber(v_u_72)
+    newXinXin = v48:Clone()
+    newXinXin.Parent = v32
+    newXinXin.LayoutOrder = v_u_72 + 1
+    newXinXin.LVText.Text = v_u_72 + 1
+end
+v_u_22.Visible = true
+v_u_23.Visible = false
+v_u_21.Visible = false
+v_u_24.Visible = false
+function v_u_1.updateUi(_, p79) -- name: updateUi
+    -- upvalues: (copy) v_u_1
+    v_u_1:UpdateReward(p79)
+    v_u_1:updateTask(p79)
+    v_u_1:updateBigShow()
+end
+function v_u_1.openUi(_) -- name: openUi
+    -- upvalues: (copy) v_u_36, (copy) v_u_10, (copy) v_u_27, (copy) v_u_28, (copy) v_u_34, (copy) v_u_25, (copy) v_u_19, (copy) v_u_11
+    v_u_36.Value = "Rewards"
+    v_u_10.SetUIlistSize(v_u_27)
+    v_u_10.SetUIlistSize(v_u_28)
+    if v_u_34.Value > 2 then
+        v_u_25.CanvasPosition = Vector2.new(140 * (v_u_34.Value - 2), 0)
+    else
+        v_u_25.CanvasPosition = Vector2.new(0, 0)
+    end
+    local v80 = v_u_19:FindFirstChild("RedPoint"):FindFirstChild("SeasonRedP")
+    if v80 and v80.Value == 1 then
+        v_u_11:FireServer("SeasonRedP")
+    end
+end
+local v_u_81 = require(v2.Tool.ShowDetail)
+function v_u_1.closeUi(_, _) -- name: closeUi
+    -- upvalues: (copy) v_u_15, (copy) v_u_81
+    v_u_15.PopBack(script.Parent)
+    v_u_81.HideAllDetail()
+end
+function v_u_1.UpdateReward(_, p82) -- name: UpdateReward
+    -- upvalues: (copy) v_u_9, (copy) v_u_19, (copy) v_u_7, (copy) v_u_4, (copy) v_u_25, (copy) v_u_22
+    if p82 == nil then
+        p82 = require(game.StarterPlayer.StarterPlayerScripts.LocalData):GetLocalData()
+    end
+    local v83 = v_u_9.CheckIsBuyRegular(v_u_19, v_u_7.ItemID.SeasonCard)
+    if v83 == false then
+        v83 = v_u_9.CheckIsBuyPremium(v_u_19, v_u_7.ItemID.SeasonAdvanced)
+    end
+    local v84 = v_u_19:WaitForChild("Bag")
+    local v85 = v84 and v84:FindFirstChild(v_u_7.ItemID.SeasonLevel)
+    if not v85 then
+        ::l6::
+        return
+    end
+    local v86 = p82.Season
+    local v87 = v86.GetRecord
+    local v88 = v86.GetRecordPay
+    local v89 = 0
+    for v90 = 1, #v_u_4 do
+        local _ = v_u_4[v90]
+        local v91 = v_u_25.Free:FindFirstChild(v90)
+        local v92 = v_u_25.Premium:FindFirstChild(v90)
+        local v93 = v91["\229\183\178\233\162\134\229\143\150"]
+        local v94 = v91.ClaimBtn
+        local v95 = v92["\229\183\178\233\162\134\229\143\150"]
+        local v96 = v92.ClaimBtn
+        local v97 = v91.Lock
+        local v98 = v92.Lock
+        if v90 <= v85.Value then
+            v97.Visible = false
+            v98.Visible = false
+            if not v87[tostring(v90)] then
+                ::l13::
+                v93.Visible = false
+                v94.Visible = true
+                goto l15
+            end
+            local v99 = v87[tostring(v90)]
+            if tonumber(v99) ~= 1 then
+                goto l13
+            end
+            v93.Visible = true
+            v94.Visible = false
+            ::l15::
+            if v88[tostring(v90)] then
+                local v100 = v88[tostring(v90)]
+                if tonumber(v100) ~= 1 then
+                    goto l17
+                end
+                v95.Visible = true
+                v96.Visible = false
+                v89 = v90
+            else
+                ::l17::
+                v95.Visible = false
+                v96.Visible = true
+                v89 = v90
+            end
+        else
+            v97.Visible = true
+            v98.Visible = true
+            v93.Visible = false
+            v95.Visible = false
+            v94.Visible = false
+            v96.Visible = false
+            local v101 = v97.SkipBtn
+            local v102 = v98.SkipBtn
+            if v90 == v89 + 1 then
+                v101.Visible = true
+                v102.Visible = true
+            else
+                v101.Visible = false
+                v102.Visible = false
+            end
+        end
+    end
+    local v103
+    if v85 and (v85.Value >= #v_u_4 and v83) then
+        v103 = true
+        for v104 = 1, #v_u_4 do
+            if not v87[tostring(v104)] or v87[tostring(v104)] ~= 1 or (not v88[tostring(v104)] or v88[tostring(v104)] ~= 1) then
+                v103 = false
+                break
+            end
+        end
+    else
+        v103 = false
+    end
+    v_u_22.BtnReset.Visible = v103
+    goto l6
+end
+function v_u_1.updateTask(_, p105) -- name: updateTask
+    -- upvalues: (copy) v_u_3, (copy) v_u_23
+    if p105 == nil then
+        p105 = require(game.StarterPlayer.StarterPlayerScripts.LocalData):GetLocalData()
+    end
+    local v106 = p105.Season
+    if v106 then
+        local v107 = v106.TaskDay
+        if v107 then
+            for v108, v109 in pairs(v107) do
+                local v110 = v109.TaskID
+                local v111 = v109.TaskNum
+                local v112 = math.floor(v111)
+                local _ = v109.IsClaimed
+                local v113 = v_u_3.GetSeasonCfg(v110)
+                if v113 then
+                    local v114 = v_u_3.GetSeasontasktypeConf(v113.TaskType)
+                    local v115 = v113.param
+                    local v116 = v113.Exp
+                    local v117 = v_u_23.ScrollingDFrame:FindFirstChild("Dtask" .. v108)
+                    if v117 then
+                        v117.TaskTitle.Text = string.gsub(v114.Task, "{1}", v115)
+                        v117["\231\187\143\233\170\140"].Num.Text = v116 .. " Exp"
+                        local v118 = v117["\232\191\155\229\186\166\230\157\161"].Frame.Progress.Container
+                        local v119 = UDim2.new
+                        local v120 = v112 / v115
+                        v118.Size = v119(math.min(v120, 1), v118.Size.X.Offset, v118.Size.Y.Scale, v118.Size.Y.Offset)
+                        if v112 == 0 then
+                            v118.Visible = false
+                        else
+                            v118.Visible = true
+                        end
+                        v117["\232\191\155\229\186\166\230\157\161"].Progress.Text = math.min(v112, v115) .. "/" .. v115
+                    end
+                end
+            end
+        end
+        local v121 = v106.TaskWeek
+        if v121 then
+            for v122, v123 in pairs(v121) do
+                local v124 = v123.TaskID
+                local v125 = v123.TaskNum
+                local _ = v123.IsClaimed
+                local v126 = v_u_3.GetSeasonCfg(v124)
+                if v126 then
+                    local v127 = v_u_3.GetSeasontasktypeConf(v126.TaskType)
+                    local v128 = v126.param
+                    local v129 = v126.Exp
+                    local v130 = v_u_23.ScrollingWFrame:FindFirstChild("Wtask" .. v122)
+                    if v130 then
+                        v130.TaskTitle.Text = string.gsub(v127.Task, "{1}", v128)
+                        v130["\231\187\143\233\170\140"].Num.Text = v129 .. " Exp"
+                        local v131 = v130["\232\191\155\229\186\166\230\157\161"].Frame.Progress.Container
+                        local v132 = UDim2.new
+                        local v133 = v125 / v128
+                        v131.Size = v132(math.min(v133, 1), v131.Size.X.Offset, v131.Size.Y.Scale, v131.Size.Y.Offset)
+                        if v125 == 0 then
+                            v131.Visible = false
+                        else
+                            v131.Visible = true
+                        end
+                        v130["\232\191\155\229\186\166\230\157\161"].Progress.Text = math.min(v125, v128) .. "/" .. v128
+                    end
+                end
+            end
+        end
+    end
+end
+function v_u_1.updateBigShow(_) -- name: updateBigShow
+    -- upvalues: (copy) v_u_22, (copy) v_u_3, (copy) v_u_6, (copy) v_u_10, (copy) v_u_12
+    local v134 = v_u_22:FindFirstChild("ScrollBigShow"):FindFirstChild("BigShow")
+    local v135 = v134:FindFirstChild("ViewportFrame")
+    local v136 = v134:FindFirstChild("BG")
+    local v137 = v134:FindFirstChild("AddFrame")
+    local v138 = v134:FindFirstChild("ZhName")
+    local v139 = v134:FindFirstChild("GanDa1")
+    local v140 = v134:FindFirstChild("Value").Value
+    local v141 = v_u_3.FindCfgByID(v140)
+    if v140 == 18000018 then
+        v135.Visible = false
+        v139.Visible = true
+    else
+        v135.Visible = true
+        v139.Visible = false
+        v_u_6.createViewPort(v135, v140, v141.tp)
+        v_u_10.SetViewportPlayAnim(v135, v141.ShowAction)
+    end
+    v_u_10.setXydBg_T26(v136, v141.xyd)
+    v138.Text = v141.ZhName
+    v_u_12.addGradients(v138, v141.xyd)
+    v_u_10.SetAddFrame(v137, v141.CoachBuffType, v141.CoachBuffNumber)
+end
+(function() -- name: updateBigShowPet
+    -- upvalues: (copy) v_u_22, (copy) v_u_3, (copy) v_u_10, (copy) v_u_12, (copy) v_u_19, (copy) v_u_5
+    local v142 = v_u_22:FindFirstChild("ScrollBigShow"):FindFirstChild("BigShowPet")
+    local v143 = v142:FindFirstChild("BG")
+    local v144 = v142:FindFirstChild("AddGoldFrame")
+    v144.Visible = false
+    local v145 = v142:FindFirstChild("ZhName")
+    local v146 = v142["\231\153\190\229\136\134\231\153\190\229\174\160\231\137\169"]
+    local v147 = v142:FindFirstChild("Value").Value
+    local v148 = v_u_3.FindCfgByID(v147)
+    v_u_10.setXydBg_T26(v143, v148.xyd)
+    v145.Text = v148.ZhName
+    v_u_12.addGradients(v145, v148.xyd)
+    local v149 = v_u_19:FindFirstChild("MaxPetPower")
+    if v149 then
+        local _ = v149.Value
+    end
+    if v148.P and v148.P == "1" then
+        v146.Visible = true
+        v146.RichText = true
+        local v150 = v148.Energy_P
+        v146.Text = v_u_5.getNumStr(v150) .. "% as strong as your best pet!"
+        local v151 = v144.Add
+        if v151 then
+            v151.Visible = true
+            v151.Text = "x" .. v_u_5.getNumStr(v148.Energy)
+        end
+    else
+        v146.Visible = false
+        local v152 = v144.Add
+        if v152 then
+            v152.Visible = true
+            v152.Text = "x" .. v_u_5.getNumStr(v148.Energy)
+        end
+    end
+    v144.AddIcon.Image = "rbxassetid://125210336961906"
+end)()
+coroutine.wrap(function() -- name: LoopShowBig
+    -- upvalues: (copy) v_u_22, (copy) v_u_19
+    local v153 = v_u_22:FindFirstChild("ScrollBigShow")
+    if v153 then
+        local v154 = game:GetService("TweenService")
+        local v155 = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local v156 = 344
+        local v157 = 1
+        local v158 = v_u_19.PlayerGui
+        if v158 then
+            local v159 = v158.ScreenGui
+            if v159 then
+                local v160 = v159:FindFirstChild("UIScale")
+                if v160 and v160:IsA("UIScale") then
+                    v157 = v160.Scale
+                end
+            end
+        end
+        if v157 then
+            v156 = v156 * v157
+        end
+        while true do
+            v154:Create(v153, v155, {
+                ["CanvasPosition"] = Vector2.new(v156, 0)
+            }):Play()
+            task.wait(5)
+            v154:Create(v153, v155, {
+                ["CanvasPosition"] = Vector2.new(0, 0)
+            }):Play()
+            task.wait(5)
+        end
+    else
+        return
+    end
+end)()
+v8.NumValueAdd(v33, v_u_71)
+v8.NumValueAdd(v_u_34, function()
+    -- upvalues: (copy) v_u_71, (copy) v_u_1, (copy) v_u_34, (copy) v_u_4, (copy) v_u_22
+    v_u_71()
+    v_u_1:UpdateReward()
+    if v_u_34.Value >= #v_u_4 then
+        v_u_22.BtnUnlockAll.Visible = false
+    else
+        v_u_22.BtnUnlockAll.Visible = true
+    end
+end)
+local function v_u_166(p161, p162, p163) -- name: updateRewardDisplay
+    -- upvalues: (copy) v_u_3, (copy) v_u_7, (copy) v_u_9, (copy) v_u_19, (copy) v_u_5, (copy) v_u_6
+    if p161 then
+        p161.ViewportFrame:ClearAllChildren()
+        p161.ViewportFrame:SetAttribute("itemID", nil)
+        p161.Icon.Visible = false
+        p161.ViewportFrame.Visible = false
+        local v164 = v_u_3.FindCfgByID(p162)
+        if p162 == v_u_7.ItemID.Coin then
+            p161.Count.Visible = true
+            local v165 = v_u_9.GetCoinAfterWorld(v_u_19, p163)
+            p161.Count.Text = "x" .. v_u_5.getNumStr(v165)
+        elseif p163 > 1 then
+            p161.Count.Visible = true
+            p161.Count.Text = "x" .. v_u_5.getNumStr(p163)
+        else
+            p161.Count.Visible = false
+        end
+        if v164 then
+            p161.itemName.Visible = true
+            p161.itemName.Text = v164.ZhName
+            if v164.tp == v_u_7.ItemType.Pet then
+                v_u_6.createViewPort(p161.ViewportFrame, p162)
+                p161.ViewportFrame.Visible = true
+                return
+            end
+            if v164.tp == v_u_7.ItemType.Egg then
+                v_u_6.createViewPort(p161.ViewportFrame, p162, v_u_7.ItemType.Egg)
+                p161.ViewportFrame.Visible = true
+                return
+            end
+            if v164.Icon and v164.Icon ~= "" then
+                p161.Icon.Image = "rbxassetid://" .. v164.Icon
+                p161.Icon.Visible = true
+                return
+            end
+        else
+            p161.itemName.Visible = false
+        end
+    end
+end
+local v_u_167 = v_u_19:WaitForChild("SeasonResetTime", (1 / 0))
+local v_u_168 = v_u_19:WaitForChild("UnlockWorld", (1 / 0))
+v8.NumValueAdd(v_u_168, function()
+    -- upvalues: (copy) v_u_4, (copy) v_u_25, (copy) v_u_167, (copy) v_u_7, (copy) v_u_5, (copy) v_u_9, (copy) v_u_19
+    for v169, v170 in pairs(v_u_4) do
+        local v171 = v_u_25.Free:FindFirstChild(v169)
+        local v172 = v_u_25.Premium:FindFirstChild(v169)
+        local v173 = v_u_167
+        if v173 then
+            v173 = v_u_167.Value > 0
+        end
+        local v174 = v173 and v170.ExAwardID
+        if v174 then
+            v174 = v170.ExAwardID[1] ~= ""
+        end
+        local v175 = v173 and v170.ExPayAwardID
+        if v175 then
+            v175 = v170.ExPayAwardID[1] ~= ""
+        end
+        if v174 and (v170.ExAwardID[1] == v_u_7.ItemID.Coin and v170.ExCountID[1]) then
+            if v171 and v171.Count then
+                v171.Count.Text = "x" .. v_u_5.getNumStr(v_u_9.GetCoinAfterWorld(v_u_19, v170.ExCountID[1]))
+            end
+        elseif v170.AwardID[1] == v_u_7.ItemID.Coin and (v170.CountID[1] and (v171 and v171.Count)) then
+            v171.Count.Text = "x" .. v_u_5.getNumStr(v_u_9.GetCoinAfterWorld(v_u_19, v170.CountID[1]))
+        end
+        if v175 and (v170.ExPayAwardID[1] == v_u_7.ItemID.Coin and v170.ExPayCountID[1]) then
+            if v172 and v172.Count then
+                v172.Count.Text = "x" .. v_u_5.getNumStr(v_u_9.GetCoinAfterWorld(v_u_19, v170.ExPayCountID[1]))
+            end
+        elseif v170.PayAwardID[1] == v_u_7.ItemID.Coin and (v170.PayCountID[1] and (v172 and v172.Count)) then
+            v172.Count.Text = "x" .. v_u_5.getNumStr(v_u_9.GetCoinAfterWorld(v_u_19, v170.PayCountID[1]))
+        end
+    end
+end)
+v8.NumValueAdd(v_u_167, function()
+    -- upvalues: (copy) v_u_167, (copy) v_u_4, (copy) v_u_25, (copy) v_u_166, (copy) v_u_10, (copy) v_u_168
+    if v_u_167.Value > 0 then
+        for v176, v177 in pairs(v_u_4) do
+            local v178 = v_u_25.Free:FindFirstChild(v176)
+            local v179 = v_u_25.Premium:FindFirstChild(v176)
+            local v180
+            if #v177.ExAwardID > 0 then
+                v180 = v177.ExAwardID[1] ~= ""
+            else
+                v180 = false
+            end
+            local v181
+            if #v177.ExPayAwardID > 0 then
+                v181 = v177.ExPayAwardID[1] ~= ""
+            else
+                v181 = false
+            end
+            if v180 then
+                v_u_166(v178, v177.ExAwardID[1], v177.ExCountID[1])
+                v_u_10.SetDetail(v178, v177.ExAwardID[1])
+            end
+            if v181 then
+                v_u_166(v179, v177.ExPayAwardID[1], v177.ExPayCountID[1])
+                v_u_10.SetDetail(v179, v177.ExPayAwardID[1])
+            end
+        end
+    end
+    if v_u_168 then
+        v_u_168.Value = v_u_168.Value
+    end
+end)
+local v182 = v_u_24:FindFirstChild("BtnList")
+local v_u_183 = v182:FindFirstChild("Btn")
+local v_u_184 = v182.RobluxBtn1
+local v_u_185 = v182.RobluxBtn10
+local v_u_186 = v18.Season["\230\138\189\229\165\150\228\187\183\230\160\188x1"] or 1
+local v_u_187 = v18.Season["\230\138\189\229\165\150\228\187\183\230\160\188x3"] or 3
+local v_u_188 = v18.Season["\230\138\189\229\165\150\228\187\183\230\160\188x10"] or 10
+(function() -- name: updateButtonPrices
+    -- upvalues: (copy) v_u_183, (copy) v_u_5, (copy) v_u_186, (copy) v_u_184, (copy) v_u_187, (copy) v_u_185, (copy) v_u_188
+    local v189 = v_u_183:FindFirstChild("priceText")
+    if v189 then
+        v189.Text = v_u_5.getNumStr(v_u_186)
+    end
+    local v190 = v_u_184:FindFirstChild("priceText")
+    if v190 then
+        v190.Text = v_u_5.getNumStr(v_u_187)
+    end
+    local v191 = v_u_185:FindFirstChild("priceText")
+    if v191 then
+        v191.Text = v_u_5.getNumStr(v_u_188)
+    end
+end)()
+v8.AddMouseCLick(v_u_183.Button, function()
+    -- upvalues: (copy) v_u_14
+    v_u_14:InvokeServer("SeasonHatch", 1)
+end, v_u_183)
+v8.AddMouseCLick(v_u_184.Button, function()
+    -- upvalues: (copy) v_u_14
+    v_u_14:InvokeServer("SeasonHatch", 3)
+end, v_u_184)
+v8.AddMouseCLick(v_u_185.Button, function()
+    -- upvalues: (copy) v_u_14
+    v_u_14:InvokeServer("SeasonHatch", 10)
+end, v_u_185);
+(function(p192) -- name: updateBigShow1
+    -- upvalues: (copy) v_u_3, (copy) v_u_6, (copy) v_u_10, (copy) v_u_12
+    local v193 = p192:FindFirstChild("ViewportFrame")
+    local v194 = p192:FindFirstChild("BG")
+    local v195 = p192:FindFirstChild("AddFrame")
+    local v196 = p192:FindFirstChild("ZhName")
+    local v197 = p192:FindFirstChild("GanDa2")
+    local v198 = p192:FindFirstChild("showId").Value
+    local v199 = v_u_3.FindCfgByID(v198)
+    if v198 == 18000019 then
+        v193.Visible = false
+        v197.Visible = true
+    else
+        v193.Visible = true
+        v197.Visible = false
+        v_u_6.createViewPort(v193, v198, v199.tp)
+        v_u_10.SetViewportPlayAnim(v193, v199.ShowAction)
+    end
+    v_u_10.setXydBg_T26(v194, v199.xyd)
+    v196.Text = v199.ZhName
+    v_u_12.addGradients(v196, v199.xyd)
+    v_u_10.SetAddFrame(v195, v199.CoachBuffType, v199.CoachBuffNumber)
+end)(v_u_24.BigShow)
+local v_u_200 = require(game.StarterPlayer.StarterPlayerScripts.LocalData)
+local v_u_201 = v_u_3.GetCfgByName("luckyboxdataConf")
+local v_u_202 = v_u_24:FindFirstChild("Lottery"):FindFirstChild("LotteryScroll");
+(function(p203) -- name: UpdateLuckyBoxInfo
+    -- upvalues: (copy) v_u_202, (copy) v_u_200, (copy) v_u_201, (copy) v_u_3, (copy) v_u_10, (copy) v_u_7, (copy) v_u_13, (copy) v_u_9
+    local v204 = nil
+    local _ = v204 == p203
+    local v205 = {}
+    for _, v206 in pairs({}) do
+        v206:Disconnect()
+    end
+    for _, v207 in pairs(v205) do
+        v207:Disconnect()
+    end
+    if v204 ~= p203 then
+        for _, v208 in pairs(v_u_202:GetChildren()) do
+            if v208:IsA("Frame") and v208.Name ~= "temp" then
+                v208:Destroy()
+            end
+        end
+    end
+    local v209 = v_u_202.temp
+    v209.Visible = false
+    v_u_200:GetLocalData()
+    for v210, v211 in pairs(v_u_201[p203].ItemIDVt) do
+        local v212 = v_u_3.FindCfgByID(v211)
+        if v212 then
+            local v213
+            if v_u_202:FindFirstChild(v211) then
+                v213 = v_u_202:FindFirstChild(v211)
+            else
+                v213 = v209:Clone()
+                v213.Visible = true
+                v213.Name = v211
+            end
+            v213.Parent = v_u_202
+            local v214 = v213.Icon
+            local v215 = v213.BG
+            v_u_10.setXydBg_T26(v215, v212.xyd)
+            v213.ViewportFrame:ClearAllChildren()
+            v213.ViewportFrame:SetAttribute("itemID", nil)
+            if v214 and (v212.Icon and v212.Icon ~= "") then
+                v214.Visible = true
+                v214.Image = "rbxassetid://" .. v212.Icon
+                v213.ViewportFrame.Visible = false
+            elseif v212.tp == v_u_7.ItemType.Pet and v211 == 53101100 then
+                v213.ViewportFrame.Visible = false
+                v213.Icon.Visible = true
+                v213.Icon.Image = "rbxassetid://95325668495085"
+            else
+                v213.ViewportFrame.Visible = true
+                v_u_13.createViewPort(v213.ViewportFrame, v211)
+                if v212.tp == v_u_7.ItemType.Coach then
+                    v213.ViewportFrame.CurrentCamera.CFrame = CFrame.new(Vector3.new(0, 2, 1)) * CFrame.Angles(0, 3.141592653589793, 0)
+                end
+            end
+            v213.Visible = true
+            local v216, _ = v_u_9.GetChanceNoLucky(v_u_201[p203].ItemWeight, v_u_201[p203].ItemIDVt)
+            if v216[v210] then
+                v213.Chance.Text = v216[v210]
+            end
+            v_u_10.SetAtk(v211, v213)
+            v_u_10.SetDetail(v213, v211)
+        end
+    end
+end)(1)
+return v_u_1
