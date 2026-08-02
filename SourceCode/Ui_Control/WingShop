@@ -1,0 +1,446 @@
+local v1 = game:GetService("ReplicatedStorage")
+local v_u_2 = require(v1.Tool.CfgFind)
+local v_u_3 = require(v1.Tool.MathMgr)
+require(v1.Tool.Copy)
+local v_u_4 = require(v1.Tool.Viewport)
+local v5 = require(v1.Tool.AddListen)
+local v_u_6 = require(v1.Tool.GetData)
+local v_u_7 = require(v1.Tool.UIMgr)
+game:GetService("Debris")
+local v8 = v_u_2.GetCfgByName("avatarConf")
+local v_u_9 = v_u_2.GetCfgByName("wingenchantmentConf")
+local v_u_10 = script.Parent
+local v_u_11 = game.Players.LocalPlayer
+local _ = v_u_10.Frame.ScrollItem
+require(v1.Tool.TipsModule)
+local v_u_12 = require(v1.Tool.EnumMgr)
+require(v1.Tool.InsMgr)
+local v_u_13 = require(game.StarterPlayer.StarterPlayerScripts.LocalData)
+local v_u_14 = v1.Msg.RemoteEvent
+local _ = v1.Msg.RemoteFunction
+local v_u_15 = script.Parent.nowFood
+local v_u_16 = v_u_15.Value
+local v_u_17 = script.Parent.ShowTp
+local v18 = v_u_10.Frame.ScrollItem.Temp
+local v_u_19 = v_u_10.Frame.ScrollItem
+v18.Visible = false
+local v20 = 0
+local v_u_21 = {}
+local v_u_22 = {}
+local v23 = {}
+for v24, v25 in pairs(v8) do
+    if v25.Show == "1" then
+        local v26 = v18:Clone()
+        v26.Visible = true
+        v26.Parent = v_u_19
+        v20 = v20 + 1
+        v26.Name = v25.Sort
+        v26:SetAttribute("ItemID", v24)
+        v26:SetAttribute("Sort", v25.Sort)
+        v26:SetAttribute("Price", v25.price)
+        local v27 = v26.Frame.Icon
+        local v28 = v26.Frame.IconImg
+        local v29 = v26.Frame.itemName
+        local v30
+        if v25.Add_P and v25.Add_P ~= "" then
+            local v31 = v25.Add_P
+            v30 = 10000 - tonumber(v31)
+        else
+            v30 = v25.Sort
+        end
+        v26.LayoutOrder = v30
+        v26.ZIndex = v25.Sort
+        if v24 == 13000001 then
+            v28.Visible = true
+            v27.Visible = false
+            v28.Image = "rbxthumb://type=Asset&id=" .. v25.ID .. "&w=420&h=420"
+        else
+            v28.Visible = false
+            v27.Visible = true
+        end
+        v29.Text = v25.ZhName
+        local v32 = v25.price
+        if type(v32) == "number" and v25.price < 0 then
+            table.insert(v_u_21, v26)
+        elseif v_u_6.CheckAvatarIsP(v24) then
+            table.insert(v_u_21, v26)
+        else
+            table.insert(v_u_22, v26)
+        end
+    end
+end
+v18:Destroy()
+table.sort(v_u_22, function(p33, p34)
+    return p33.LayoutOrder < p34.LayoutOrder
+end)
+table.sort(v_u_21, function(p35, p36)
+    -- upvalues: (copy) v_u_2, (copy) v_u_12, (copy) v_u_6
+    local v37 = tonumber(p35:GetAttribute("ItemID"))
+    local v38 = tonumber(p36:GetAttribute("ItemID"))
+    local v39 = v_u_2.FindCfgByID(v37, v_u_12.Avatar)
+    local v40 = v_u_2.FindCfgByID(v38, v_u_12.Avatar)
+    local v41 = v_u_6.CheckAvatarIsP(v37)
+    local v42 = v_u_6.CheckAvatarIsP(v38)
+    if v41 and not v42 then
+        return true
+    end
+    if not v41 and v42 then
+        return false
+    end
+    if not (v41 and v42) then
+        return p35.LayoutOrder < p36.LayoutOrder
+    end
+    local v43 = v39.Add_P
+    local v44 = tonumber(v43)
+    local v45 = v40.Add_P
+    return tonumber(v45) < v44
+end)
+local v_u_46 = v_u_10.Frame.ScrollItem:FindFirstChildOfClass("UIGridLayout")
+local v47 = v_u_10.Frame.View
+local v_u_48 = v47.Icon
+local v_u_49 = v47.IconImg
+local v_u_50 = v47.BtnBuy
+local v_u_51 = v47.BtnWear
+local v_u_52 = v47.HasWear
+local v_u_53 = v_u_50.Price
+local v_u_54 = v47.itemName
+local v_u_55 = v47.Speed
+local v_u_56 = v47.SpeedDesc
+local v_u_57 = v47.Magic
+v5.AddMouseCLick(v_u_50, function()
+    -- upvalues: (copy) v_u_14, (copy) v_u_15
+    v_u_14:FireServer("BuyWing", v_u_15.Value)
+end, v_u_50)
+v5.AddMouseCLick(v_u_51, function()
+    -- upvalues: (copy) v_u_14, (copy) v_u_15
+    v_u_14:FireServer("WearWings", v_u_15.Value)
+end, v_u_51)
+local function v_u_77(p58) -- name: nowFoodChange
+    -- upvalues: (copy) v_u_2, (copy) v_u_12, (ref) v_u_16, (copy) v_u_19, (copy) v_u_49, (copy) v_u_48, (copy) v_u_4, (copy) v_u_54, (copy) v_u_53, (copy) v_u_3, (copy) v_u_6, (copy) v_u_11, (copy) v_u_55, (copy) v_u_56, (copy) v_u_13, (copy) v_u_57, (copy) v_u_9, (copy) v_u_50, (copy) v_u_51, (copy) v_u_52
+    if p58 == 0 then
+        return
+    end
+    local v59 = v_u_2.FindCfgByID(p58, v_u_12.Avatar)
+    local v60 = v_u_16 ~= 0 and v_u_16 ~= p58 and v_u_19:FindFirstChild(v_u_2.FindCfgByID(v_u_16, v_u_12.Avatar).Sort)
+    if v60 then
+        v60.Chose.Visible = false
+    end
+    if p58 == 13000001 then
+        v_u_49.Visible = true
+        v_u_48.Visible = false
+        v_u_49.Image = "rbxthumb://type=Asset&id=" .. v59.ID .. "&w=420&h=420"
+    else
+        v_u_49.Visible = false
+        v_u_48.Visible = true
+        v_u_4.createViewPort(v_u_48, p58, v_u_12.ItemType.Avatar)
+    end
+    v_u_54.Text = v59.ZhName
+    v_u_53.Text = v_u_3.getNumStr(v59.price)
+    if v_u_6.CheckAvatarIsP(p58) then
+        local v61 = v_u_11:FindFirstChild("MaxAvatarPower").Value
+        local v62 = v_u_55
+        local v63 = v_u_3.getNumStr
+        local v64 = v59.Add_P
+        v62.Text = v63(tonumber(v64) / 100 * v61)
+        local v65 = v_u_56
+        local v66 = v_u_3.getNumStr
+        local v67 = v59.Add_P
+        v65.Text = v66(tonumber(v67) - 100) .. "% better than your best wing!"
+        v_u_56.TextSize = 33
+        v_u_56.TextYAlignment = Enum.TextYAlignment.Center
+    else
+        v_u_55.Text = v_u_3.getNumStr(v59.Add[1])
+        v_u_56.Text = "Climb Speed +"
+        v_u_56.TextSize = 40
+        v_u_56.TextYAlignment = Enum.TextYAlignment.Bottom
+    end
+    local v68 = v_u_13:GetLocalData()
+    local v71
+    if v68 then
+        local v70 = v68.Bag
+        if not v70 then
+            v71 = nil
+            goto l15
+        end
+        for _, v71 in pairs(v70) do
+            if v71.id == p58 then
+                ::l15::
+                v_u_57.Visible = v71 and v71.Magic and true or false
+                local v72 = false
+                local v73 = false
+                if v71 then
+                    if v71.Magic then
+                        local v74 = v_u_9
+                        local v75 = v71.Magic
+                        local v76 = v74[tonumber(v75)]
+                        if v76 then
+                            v_u_57.Image = "rbxassetid://" .. v76.Icon
+                        else
+                            v_u_57.Image = ""
+                        end
+                    end
+                    v72 = v71.count and v71.count >= 1 and true or v72
+                    if v71.using and v71.using == 1 then
+                        v73 = true
+                    end
+                end
+                if v72 then
+                    v_u_50.Visible = false
+                    v_u_51.Visible = not v73
+                    v_u_52.Visible = v73
+                else
+                    v_u_50.Visible = true
+                    v_u_51.Visible = false
+                    v_u_52.Visible = false
+                end
+                v_u_16 = p58
+                return
+            end
+        end
+        v71 = nil
+        goto l15
+    else
+        v71 = nil
+        goto l15
+    end
+end
+v_u_15.Changed:Connect(v_u_77)
+local function v_u_125() -- name: updateTempList
+    -- upvalues: (copy) v_u_17, (copy) v_u_22, (copy) v_u_21, (copy) v_u_6, (copy) v_u_11, (copy) v_u_15, (copy) v_u_13, (copy) v_u_2, (copy) v_u_9, (copy) v_u_4, (copy) v_u_12, (copy) v_u_10, (copy) v_u_46, (copy) v_u_7, (copy) v_u_19
+    local v78 = 0
+    local v79 = 0
+    local v80
+    if v_u_17.Value == 0 then
+        v80 = v_u_22
+        for _, v81 in pairs(v_u_21) do
+            v81.Visible = false
+        end
+        v79 = #v80
+        if v79 == #v80 then
+            local v82 = v_u_6.GetBestUnlockedWing(v_u_11, false)
+            if v82 then
+                v_u_15.Value = v82
+            end
+        end
+    else
+        v80 = v_u_21
+        for _, v83 in pairs(v_u_22) do
+            v83.Visible = false
+        end
+        v_u_15.Value = v_u_6.GetBestUnlockedWing(v_u_11, true)
+    end
+    local v84 = 1000000000000000
+    for _, v85 in ipairs(v80) do
+        local v86 = tonumber(v85:GetAttribute("ItemID"))
+        local v87 = v85.Name
+        local v88 = tonumber(v87)
+        local v89 = v85.Frame.HasBuy
+        local v90 = v85.Frame.Icon
+        local v91 = v85.Lock
+        local v92 = v85.Frame.UnBuy
+        local v93 = v85.Chose
+        local v94 = tonumber(v85:GetAttribute("Sort"))
+        local v95 = v85.Black
+        v93.Visible = v86 == v_u_15.Value
+        local v96 = v_u_6.GetItemCountByID(v_u_11, v86) >= 1
+        if v_u_17.Value == 0 then
+            v85.Visible = true
+            local v97 = v_u_13:GetLocalData()
+            local v100
+            if v97 then
+                local v99 = v97.Bag
+                if v99 then
+                    for _, v100 in pairs(v99) do
+                        if v100.id == v86 then
+                            goto l23
+                        end
+                    end
+                    v100 = nil
+                else
+                    v100 = nil
+                end
+            else
+                v100 = nil
+            end
+            ::l23::
+            v89.Visible = v96
+            if v100 and v100.using then
+                if v100.using == 1 then
+                    v78 = v86
+                end
+            end
+            if v96 then
+                v92.Visible = false
+                v91.Visible = false
+                v85.Frame.Visible = true
+            else
+                local v101 = v_u_2.GetBeforeWinsID(v94)
+                if v101 then
+                    local v102 = v_u_6.GetItemCountByID(v_u_11, v101)
+                    if v86 == 13000001 or v102 >= 1 then
+                        v92.Visible = true
+                        v91.Visible = false
+                        v85.Frame.Visible = true
+                        v90.ImageColor3 = Color3.new(1, 1, 1)
+                        local v103 = v88 / 3
+                        local v104 = math.floor(v103)
+                        if v104 * 3 < v88 then
+                            local _ = v104 + 1
+                        end
+                        v_u_15.Value = v86
+                        v84 = v94
+                    else
+                        v92.Visible = false
+                        v91.Visible = true
+                        v85.Frame.Visible = true
+                    end
+                else
+                    v92.Visible = false
+                    v91.Visible = false
+                    v85.Frame.Visible = true
+                    v84 = v94
+                end
+            end
+            if v_u_15.Value == 0 and not v96 then
+                v_u_15.Value = v86
+            end
+            if v100 and v100.Magic then
+                local v105 = v_u_9
+                local v106 = v100.Magic
+                local v107 = v105[tonumber(v106)]
+                v85.Frame.Magic.Visible = v107
+                if v107 then
+                    v85.Frame.Magic.Image = "rbxassetid://" .. v107.Icon
+                else
+                    v85.Frame.Magic.Image = ""
+                end
+            else
+                v85.Frame.Magic.Visible = false
+            end
+        else
+            local v108 = v_u_13:GetLocalData()
+            local v111
+            if v108 then
+                local v110 = v108.Bag
+                if v110 then
+                    for _, v111 in pairs(v110) do
+                        if v111.id == v86 then
+                            goto l54
+                        end
+                    end
+                    v111 = nil
+                else
+                    v111 = nil
+                end
+            else
+                v111 = nil
+            end
+            ::l54::
+            if v111 and v111.using then
+                if v111.using == 1 then
+                    v78 = v86
+                end
+            end
+            if v96 then
+                v79 = v79 + 1
+            end
+            v85.Visible = v96
+            v90.Visible = true
+            v89.Visible = true
+            v92.Visible = false
+            v91.Visible = false
+            v95.Visible = false
+            v_u_4.createViewPort(v90, v86, v_u_12.ItemType.Avatar)
+            if v111 and v111.Magic then
+                local v112 = v_u_9
+                local v113 = v111.Magic
+                local v114 = v112[tonumber(v113)]
+                v85.Frame.Magic.Visible = v114
+                if v114 then
+                    v85.Frame.Magic.Image = "rbxassetid://" .. v114.Icon
+                else
+                    v85.Frame.Magic.Image = ""
+                end
+            else
+                v85.Frame.Magic.Visible = false
+            end
+        end
+    end
+    if v_u_15.Value == 0 and v78 ~= 0 then
+        v_u_15.Value = v78
+    end
+    if v_u_15.Value == 0 then
+        v_u_15.Value = 13000001
+    end
+    if v_u_17.Value == 0 then
+        for _, v115 in pairs(v_u_22) do
+            local v116 = tonumber(v115:GetAttribute("ItemID"))
+            local v117 = tonumber(v115:GetAttribute("Sort"))
+            local v118 = v115.Black
+            local v119 = v115.Frame.Icon
+            local v120 = v115.Frame.IconImg
+            if v117 <= v84 + 10 then
+                v118.Visible = false
+                v_u_4.createViewPort(v119, v116, v_u_12.ItemType.Avatar)
+                v119.Visible = true
+                v120.Visible = true
+            else
+                v118.Visible = true
+                v119.Visible = false
+                v120.Visible = false
+            end
+        end
+    end
+    local v121 = v_u_10.Frame.ScrollItem
+    local v122 = UDim2.new
+    local v123 = v_u_46.CellSize.Y.Offset + v_u_46.CellPadding.Y.Offset
+    local v124 = v79 / 3
+    v121.CanvasSize = v122(0, 0, 0, v123 * math.ceil(v124))
+    v_u_7.AutoScrollToItem(v_u_19, v_u_15.Value)
+end
+function v23.updateUi(_) -- name: updateUi
+    -- upvalues: (copy) v_u_125, (copy) v_u_15, (copy) v_u_77
+    v_u_125()
+    if v_u_15.Value ~= 0 then
+        v_u_77(v_u_15.Value)
+    end
+end
+local v_u_126 = v_u_10["\229\183\166\232\190\185Tab"]
+local v_u_127 = v_u_126["\231\191\133\232\134\128\229\149\134\229\186\151"]
+local v_u_128 = v_u_126["\229\183\178\232\180\173\228\185\176\231\191\133\232\134\128"]
+v5.AddMouseCLick(v_u_127, function()
+    -- upvalues: (copy) v_u_17
+    v_u_17.Value = 0
+end, v_u_127)
+v5.AddMouseCLick(v_u_128, function()
+    -- upvalues: (copy) v_u_17
+    v_u_17.Value = 1
+end, v_u_128)
+v5.NumValueAdd(v_u_17, function()
+    -- upvalues: (copy) v_u_15, (copy) v_u_125, (copy) v_u_17, (copy) v_u_127, (copy) v_u_128
+    v_u_15.Value = 0
+    v_u_125()
+    if v_u_17.Value == 1 then
+        v_u_127.Image = "rbxassetid://14356354129"
+        v_u_128.Image = "rbxassetid://14356660500"
+    else
+        v_u_128.Image = "rbxassetid://14356354129"
+        v_u_127.Image = "rbxassetid://14356660500"
+    end
+end)
+function v23.openUi(_) -- name: openUi
+    -- upvalues: (copy) v_u_21, (copy) v_u_6, (copy) v_u_11, (copy) v_u_126
+    task.spawn(function()
+        -- upvalues: (ref) v_u_21, (ref) v_u_6, (ref) v_u_11, (ref) v_u_126
+        for _, v129 in pairs(v_u_21) do
+            local v130 = tonumber(v129:GetAttribute("ItemID"))
+            if v_u_6.GetItemCountByID(v_u_11, v130) >= 1 then
+                v_u_126.Visible = true
+                return
+            end
+        end
+        v_u_126.Visible = false
+    end)
+end
+function v23.closeUi(_) -- name: closeUi end
+return v23
