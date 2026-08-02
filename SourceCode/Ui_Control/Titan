@@ -1,0 +1,744 @@
+local v1 = game:GetService("ReplicatedStorage")
+game:GetService("RunService")
+game:GetService("UserInputService")
+local v2 = game:GetService("Players")
+game:GetService("TeleportService")
+local v_u_3 = game:GetService("Debris")
+local v_u_4 = v2.LocalPlayer
+local v_u_5 = require(v1.Tool.MathMgr)
+require(game.StarterPlayer.StarterPlayerScripts.LocalData)
+require(v1.System.SystemBuyRoblox)
+local v_u_6 = require(v1.Tool.Viewport)
+require(v1.Tool.TipsModule)
+local v_u_7 = require(v1.Tool.GetData)
+local v_u_8 = require(v1.Tool.Log)
+local v_u_9 = require(v1.Tool.EnumMgr)
+require(v1.Tool.InsMgr)
+local v_u_10 = require(v1.Tool.UIanima)
+local v_u_11 = require(v1.Tool.UIMgr)
+local v_u_12 = require(v1.Tool.GradientsMgr)
+require(v1.Tool["Frame animation"])
+local v_u_13 = require(v1.Tool.ShowDetail)
+local _ = v1.Msg.RemoteEvent
+local v_u_14 = v1.Msg.RemoteFunction
+local v_u_15 = require(v1.Tool.CfgFind)
+local v_u_16 = require(v1.Tool.AddListen)
+require(v1.Tool.CheckGamePass)
+local v_u_17 = v1.LocalMsg.showLocalUI
+local v_u_18 = v1.RareCorrespondingBg
+local v_u_19 = script.Parent
+local v_u_20 = v_u_19["\229\174\160\231\137\169\233\128\137\230\139\169"]
+local v_u_21 = v_u_19["\230\166\130\231\142\135"]
+local v_u_22 = v_u_19["\232\175\141\230\157\161\232\166\134\231\155\150\232\173\166\229\145\138"]
+local v_u_23 = v_u_19.Frame.Main
+local v24 = v_u_19.Frame.Button
+local v_u_25 = require(v1.GlobalConfig.ConfigModule)
+local v_u_26 = v_u_19["\229\174\160\231\137\169onlyID"]
+local v_u_27 = v_u_19["\230\157\144\230\150\153"]
+local v28 = 0
+local v_u_29 = nil
+local v_u_30 = nil
+local v_u_31 = {}
+local v_u_32 = false
+for _, v33 in pairs(v_u_23["\230\157\144\230\150\153"]:GetChildren()) do
+    if v33:IsA("Frame") then
+        v28 = v28 + 1
+        v33.Name = v28
+    end
+end
+v_u_21.Visible = false
+local v34 = v_u_21.Frame.ScrollingFrame.Temp
+v34.Visible = false
+local v_u_35 = v_u_15.GetCfgByName("magicConf")
+local v36 = v_u_15.GetCfgByName("titanConf")
+local v37 = v_u_15.GetTitanTotalWeight()
+for v38, v39 in pairs(v36) do
+    if v39.Weight > 0 then
+        local v40 = v34:Clone()
+        v40.Parent = v_u_21.Frame.ScrollingFrame
+        v40.Name = v38
+        v40.LayoutOrder = -v39.Weight
+        v40["\229\144\141\229\173\151"].Text = v39.ZhName
+        v_u_12.addGradients(v40["\229\144\141\229\173\151"], v39.xyd)
+        v40["\230\143\143\232\191\176"].Text = v39.Des
+        v40["\230\166\130\231\142\135"].Text = v_u_5.GetChanceStr(v39.Weight, v37)
+        v40.Icon.Image = "rbxassetid://" .. v39.Icon
+        v40.Visible = true
+    end
+end
+v_u_11.SetUIlistSize(v_u_21.Frame.ScrollingFrame)
+local function v_u_42() -- name: ClearAllSelcet
+    -- upvalues: (copy) v_u_26, (copy) v_u_27
+    v_u_26.Value = 0
+    for _, v41 in pairs(v_u_27:GetChildren()) do
+        if v41:IsA("NumberValue") then
+            v41.Value = 0
+        end
+    end
+end
+local v_u_43 = v_u_20.Frame.Right["\229\144\136\230\136\144"]
+v_u_16.AddMouseCLick(v_u_43["\230\140\137\233\146\174"], function()
+    -- upvalues: (copy) v_u_20, (copy) v_u_21, (copy) v_u_19, (copy) v_u_22
+    v_u_20.Visible = false
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+        return
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+end, v_u_43)
+v_u_16.AddMouseCLick(v24["\230\159\165\231\156\139\230\166\130\231\142\135\230\140\137\233\146\174"].Button, function()
+    -- upvalues: (copy) v_u_21, (copy) v_u_20, (copy) v_u_19, (copy) v_u_22
+    v_u_21.Visible = not v_u_21.Visible
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+    local v44 = not v_u_21.Visible
+    v_u_19.Frame.Visible = v44
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+        return
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+end, v24["\230\159\165\231\156\139\230\166\130\231\142\135\230\140\137\233\146\174"])
+v_u_16.AddMouseCLick(v_u_21.BG.Exit.Button, function()
+    -- upvalues: (copy) v_u_21, (copy) v_u_20, (copy) v_u_19, (copy) v_u_22
+    v_u_21.Visible = false
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+    v_u_19.Frame.Visible = true
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+        return
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+end, v_u_21.BG.Exit)
+v_u_16.AddMouseCLick(v_u_19.BG.Exit.Button, function()
+    -- upvalues: (copy) v_u_31
+    v_u_31:closeUi()
+end, v_u_19.BG.Exit)
+local v45 = v_u_19.Frame.Main["\228\184\187\229\174\160\231\137\169"].InfoButton
+local v_u_46 = v_u_19.Frame.Main.ExplainerFrame
+local v47 = v_u_46.Frame.Window.Agree.Button
+v_u_16.AddMouseCLick(v45, function()
+    -- upvalues: (copy) v_u_46
+    v_u_46.Visible = true
+end)
+v_u_16.AddMouseCLick(v47, function()
+    -- upvalues: (copy) v_u_46
+    v_u_46.Visible = false
+end)
+local function v_u_54() -- name: Roll
+    -- upvalues: (copy) v_u_26, (ref) v_u_32, (copy) v_u_25, (copy) v_u_27, (copy) v_u_8, (copy) v_u_14, (copy) v_u_31, (ref) v_u_29, (copy) v_u_17
+    if v_u_26.Value <= 0 then
+        return
+    else
+        local v48
+        if v_u_32 then
+            v48 = v_u_25["\230\179\176\229\157\166\229\174\160\231\137\169"]["\228\187\152\232\180\185\229\144\136\230\136\144\233\156\128\232\166\129\230\157\144\230\150\153\230\149\176\233\135\143"]
+        else
+            v48 = v_u_25["\230\179\176\229\157\166\229\174\160\231\137\169"]["\229\144\136\230\136\144\233\156\128\232\166\129\230\157\144\230\150\153\230\149\176\233\135\143"]
+        end
+        local v49 = {}
+        for _, v50 in pairs(v_u_27:GetChildren()) do
+            if v50:IsA("NumberValue") and v50.Value ~= 0 then
+                local v51 = v50.Value
+                table.insert(v49, v51)
+            end
+        end
+        if #v49 >= v48 then
+            local v52 = {
+                ["mainOnlyID"] = v_u_26.Value,
+                ["FusePetVt"] = v49
+            }
+            v_u_8.warn(v52)
+            local v53 = v_u_14:InvokeServer("FuseTitanPet", v52)
+            if v53 then
+                v_u_31.closeUi()
+                v_u_17:Fire("RandHatch", {
+                    ["ID"] = v_u_29,
+                    ["result"] = v53
+                }, true)
+            end
+        end
+    end
+end
+v_u_16.AddMouseCLick(v_u_19["\232\175\141\230\157\161\232\166\134\231\155\150\232\173\166\229\145\138"].BG.Exit.Button, function()
+    -- upvalues: (copy) v_u_22, (copy) v_u_21, (copy) v_u_20, (copy) v_u_19
+    v_u_22.Visible = false
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+        return
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+end, v_u_19["\232\175\141\230\157\161\232\166\134\231\155\150\232\173\166\229\145\138"].BG.Exit)
+v_u_16.AddMouseCLick(v_u_19["\232\175\141\230\157\161\232\166\134\231\155\150\232\173\166\229\145\138"].Button["\232\191\148\229\155\158\230\140\137\233\146\174"].Button, function()
+    -- upvalues: (copy) v_u_22, (copy) v_u_21, (copy) v_u_20, (copy) v_u_19
+    v_u_22.Visible = false
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+        return
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+end, v_u_19["\232\175\141\230\157\161\232\166\134\231\155\150\232\173\166\229\145\138"].Button["\232\191\148\229\155\158\230\140\137\233\146\174"])
+v_u_16.AddMouseCLick(v_u_19["\232\175\141\230\157\161\232\166\134\231\155\150\232\173\166\229\145\138"].Button["\231\161\174\232\174\164\233\153\132\233\173\148\230\140\137\233\146\174"].Button, function()
+    -- upvalues: (copy) v_u_22, (copy) v_u_21, (copy) v_u_20, (copy) v_u_19, (copy) v_u_54
+    v_u_22.Visible = false
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+    v_u_54()
+end, v_u_19["\232\175\141\230\157\161\232\166\134\231\155\150\232\173\166\229\145\138"].Button["\231\161\174\232\174\164\233\153\132\233\173\148\230\140\137\233\146\174"])
+local function v_u_56() -- name: ShowWarning
+    -- upvalues: (ref) v_u_30, (copy) v_u_26, (copy) v_u_9, (copy) v_u_22, (copy) v_u_21, (copy) v_u_20, (copy) v_u_19
+    if not v_u_30 then
+        return false
+    end
+    for _, v55 in pairs(v_u_30) do
+        if v55.onlyID == v_u_26.Value and (v55.BigLv and v55.BigLv > v_u_9.BigLv.Huge) then
+            v_u_22.Visible = true
+            if v_u_21.Visible or v_u_20.Visible then
+                v_u_19.Frame.Visible = false
+                v_u_19.BG.Visible = false
+            elseif v_u_22.Visible then
+                v_u_19.Frame.Visible = true
+                v_u_19.BG.Visible = true
+            else
+                v_u_19.Frame.Visible = true
+                v_u_19.BG.Visible = true
+            end
+            return true
+        end
+    end
+    return false
+end
+v_u_16.AddMouseCLick(v_u_19.Frame.Button["\233\153\132\233\173\148\230\140\137\233\146\174"].Button, function()
+    -- upvalues: (copy) v_u_56, (copy) v_u_54
+    if not v_u_56() then
+        v_u_54()
+    end
+end, v_u_19.Frame.Button["\233\153\132\233\173\148\230\140\137\233\146\174"])
+local _ = nil
+local v_u_57 = require(game.StarterPlayer.StarterPlayerScripts.LocalData)
+local function v_u_63(p58) -- name: getDataAndCfg
+    -- upvalues: (copy) v_u_57, (copy) v_u_15
+    local v59 = v_u_57:GetLocalData()
+    local v60 = nil
+    for _, v61 in pairs(v59.Bag) do
+        if v61.onlyID == p58 then
+            v60 = v61
+            break
+        end
+    end
+    local v62 = v60 and v_u_15.FindCfgByID(v60.id, v60.tp)
+    if v62 then
+        return v60, v62
+    end
+end
+local v_u_64 = v_u_9.ItemType.Pet
+local v_u_65 = v_u_20.Frame.ScrollPet.Temp
+v_u_65.Visible = false
+v_u_65.Parent = v_u_20.Frame
+local v_u_66 = v_u_20.Frame.ScrollPet
+local v67 = v_u_20.Frame.Right
+local v_u_68 = v67.NowCount
+local v_u_69 = v67["\228\184\187\229\174\160\231\137\169\230\143\144\231\164\186"]
+local v_u_70 = v67["\230\157\144\230\150\153\230\143\144\231\164\186"]
+v_u_68.AutoLocalize = false
+local v_u_71 = true
+function v_u_31.updateText(_) -- name: updateText
+    -- upvalues: (ref) v_u_71, (copy) v_u_69, (copy) v_u_70, (copy) v_u_26, (copy) v_u_43, (copy) v_u_68, (copy) v_u_27, (ref) v_u_32, (copy) v_u_25
+    if v_u_71 then
+        v_u_69.Visible = true
+        v_u_70.Visible = false
+        if v_u_26.Value > 0 then
+            v_u_43.Visible = true
+            v_u_68.Text = "1/1"
+        else
+            v_u_43.Visible = false
+            v_u_68.Text = "0/1"
+        end
+    else
+        v_u_69.Visible = false
+        v_u_70.Visible = true
+        local v72 = 0
+        for _, v73 in pairs(v_u_27:GetChildren()) do
+            if v73:IsA("NumberValue") and v73.Value ~= 0 then
+                v72 = v72 + 1
+            end
+        end
+        if v_u_32 then
+            v_u_43.Visible = v_u_25["\230\179\176\229\157\166\229\174\160\231\137\169"]["\228\187\152\232\180\185\229\144\136\230\136\144\233\156\128\232\166\129\230\157\144\230\150\153\230\149\176\233\135\143"] <= v72
+            v_u_68.Text = v72 .. "/" .. v_u_25["\230\179\176\229\157\166\229\174\160\231\137\169"]["\228\187\152\232\180\185\229\144\136\230\136\144\233\156\128\232\166\129\230\157\144\230\150\153\230\149\176\233\135\143"]
+        else
+            v_u_43.Visible = v_u_25["\230\179\176\229\157\166\229\174\160\231\137\169"]["\229\144\136\230\136\144\233\156\128\232\166\129\230\157\144\230\150\153\230\149\176\233\135\143"] <= v72
+            v_u_68.Text = v72 .. "/" .. v_u_25["\230\179\176\229\157\166\229\174\160\231\137\169"]["\229\144\136\230\136\144\233\156\128\232\166\129\230\157\144\230\150\153\230\149\176\233\135\143"]
+        end
+    end
+end
+local function v_u_78() -- name: UpdateCailiao
+    -- upvalues: (ref) v_u_32, (copy) v_u_25, (copy) v_u_23
+    local v74
+    if v_u_32 then
+        v74 = v_u_25["\230\179\176\229\157\166\229\174\160\231\137\169"]["\228\187\152\232\180\185\229\144\136\230\136\144\233\156\128\232\166\129\230\157\144\230\150\153\230\149\176\233\135\143"]
+    else
+        v74 = v_u_25["\230\179\176\229\157\166\229\174\160\231\137\169"]["\229\144\136\230\136\144\233\156\128\232\166\129\230\157\144\230\150\153\230\149\176\233\135\143"]
+    end
+    for _, v75 in pairs(v_u_23["\230\157\144\230\150\153"]:GetChildren()) do
+        local v76 = v75.Name
+        if tonumber(v76) then
+            local v77 = v75.Name
+            v75.Visible = tonumber(v77) <= v74
+        end
+    end
+    v_u_23["\230\182\136\232\128\151\230\149\176\233\135\143"].Text = "Select " .. v74 .. " Normal+ same pets"
+end
+local function v_u_82() -- name: endChoose
+    -- upvalues: (copy) v_u_8, (copy) v_u_26, (ref) v_u_29, (ref) v_u_32, (copy) v_u_78, (copy) v_u_27, (copy) v_u_66, (copy) v_u_31
+    v_u_8.warn("\230\184\133\231\169\186\233\128\137\230\139\169")
+    v_u_26.Value = 0
+    v_u_29 = nil
+    v_u_32 = false
+    v_u_78()
+    for _, v79 in pairs(v_u_27:GetChildren()) do
+        if v79:IsA("NumberValue") then
+            v79.Value = 0
+        end
+    end
+    for _, v80 in pairs(v_u_66:GetChildren()) do
+        if v80.ClassName ~= "UIGridLayout" then
+            local v81 = v80.Frame:FindFirstChild("Choose")
+            if v81 then
+                v81.Visible = false
+            end
+        end
+    end
+    v_u_31.updateText()
+end
+local function v_u_94(p83) -- name: selectThisPetFuse
+    -- upvalues: (ref) v_u_71, (copy) v_u_26, (ref) v_u_29, (copy) v_u_15, (copy) v_u_9, (ref) v_u_32, (copy) v_u_78, (copy) v_u_8, (copy) v_u_66, (copy) v_u_31, (copy) v_u_25, (copy) v_u_27
+    if p83 then
+        local v84 = p83:GetAttribute("onlyID")
+        local v85 = p83:GetAttribute("petID")
+        local v86 = p83.Frame:FindFirstChild("Choose")
+        if v_u_71 then
+            v_u_26.Value = v84
+            v_u_29 = v85
+            local v87 = v_u_15.FindCfgByID(v85, v_u_9.ItemType.Pet)
+            if v87 then
+                if v87.Limit == "1" then
+                    v_u_32 = true
+                else
+                    v_u_32 = false
+                end
+            else
+                v_u_32 = false
+            end
+            v_u_78()
+            v_u_8.warn("\230\152\190\231\164\186 Choose")
+            v86.Visible = true
+            for _, v88 in pairs(v_u_66:GetChildren()) do
+                if v88:IsA("ImageButton") and v88:GetAttribute("onlyID") ~= v84 then
+                    local v89 = v88.Frame:FindFirstChild("Choose")
+                    if v89 then
+                        v89.Visible = false
+                    end
+                end
+            end
+            v_u_31.updateText()
+            return
+        else
+            local v90
+            if v_u_32 then
+                v90 = v_u_25["\230\179\176\229\157\166\229\174\160\231\137\169"]["\228\187\152\232\180\185\229\144\136\230\136\144\233\156\128\232\166\129\230\157\144\230\150\153\230\149\176\233\135\143"]
+            else
+                v90 = v_u_25["\230\179\176\229\157\166\229\174\160\231\137\169"]["\229\144\136\230\136\144\233\156\128\232\166\129\230\157\144\230\150\153\230\149\176\233\135\143"]
+            end
+            local v91 = 0
+            for _, v92 in pairs(v_u_27:GetChildren()) do
+                if v92:IsA("NumberValue") and v92.Value ~= 0 then
+                    v91 = v91 + 1
+                    if v92.Value == v84 then
+                        v92.Value = 0
+                        v_u_8.warn("\233\154\144\232\151\143 Choose")
+                        v86.Visible = false
+                        v_u_31.updateText()
+                        return
+                    end
+                end
+            end
+            if v90 > v91 then
+                for _, v93 in pairs(v_u_27:GetChildren()) do
+                    if v93:IsA("NumberValue") and v93.Value == 0 then
+                        v93.Value = v84
+                        v_u_8.warn("\230\152\190\231\164\186 Choose")
+                        v86.Visible = true
+                        v_u_31.updateText()
+                        return
+                    end
+                end
+            end
+        end
+    else
+        return
+    end
+end
+local function v_u_106(p95, p96, p97) -- name: updatePetUI
+    -- upvalues: (copy) v_u_12, (copy) v_u_7, (copy) v_u_4, (copy) v_u_5, (copy) v_u_35, (copy) v_u_9, (copy) v_u_11, (copy) v_u_6
+    local v98 = p95.Frame:FindFirstChild("itemName")
+    if v98 then
+        v98.Text = p97.ZhName
+        v_u_12.addGradients(v98, p97.xyd)
+    end
+    v_u_12.ChangeClolr(p95.Frame, p97.xyd)
+    local v99 = v_u_7.GetPetPowerAddNum(p96, v_u_4)
+    local v100 = p95.Frame:FindFirstChild("ATK")
+    if v100 then
+        v100.Visible = true
+        v100.Text = "x" .. v_u_5.getNumStr(v99)
+    end
+    if v99 then
+        p95.LayoutOrder = -v_u_5.getRankNum(v99)
+    end
+    if p96.Magic then
+        local v101 = v_u_35
+        local v102 = p96.Magic
+        local v103 = v101[tonumber(v102)]
+        if v103 then
+            p95.Frame.Magic.Image = "rbxassetid://" .. v103.Icon
+            p95.Frame.Magic.Visible = true
+        end
+    else
+        p95.Frame.Magic.Visible = false
+    end
+    local v104 = v_u_9.BigLv.Normal
+    if p96.BigLv then
+        v104 = p96.BigLv
+    end
+    v_u_11.SetBigLvUI(p95.Frame, v104)
+    local v105 = p95.Frame:FindFirstChild("ViewportFrame")
+    if v105 then
+        v_u_6.createViewPort(v105, p96.id, nil, p96)
+        v105.Visible = true
+    end
+end
+local function v_u_111() -- name: updateTempList
+    -- upvalues: (copy) v_u_66, (ref) v_u_71, (copy) v_u_9, (copy) v_u_26, (ref) v_u_29
+    for _, v107 in pairs(v_u_66:GetChildren()) do
+        if v107:IsA("ImageButton") then
+            local v108 = v107:GetAttribute("petID")
+            local v109 = v107:GetAttribute("onlyID")
+            local v110 = v107:GetAttribute("BigLv")
+            if v_u_71 then
+                if v_u_9.BigLv.Huge <= v110 then
+                    v107.Visible = true
+                else
+                    v107.Visible = false
+                end
+            elseif v109 == v_u_26.Value then
+                v107.Visible = false
+            else
+                v107.Visible = v_u_29 == v108
+            end
+        end
+    end
+end
+local v_u_112 = {}
+local function v_u_131() -- name: InitSelectList
+    -- upvalues: (ref) v_u_112, (copy) v_u_66, (copy) v_u_3, (copy) v_u_57, (ref) v_u_30, (copy) v_u_64, (copy) v_u_15, (copy) v_u_25, (copy) v_u_65, (copy) v_u_16, (ref) v_u_71, (copy) v_u_82, (copy) v_u_94, (copy) v_u_111, (copy) v_u_9, (copy) v_u_106, (copy) v_u_31
+    for _, v113 in pairs(v_u_112) do
+        v113:Disconnect()
+    end
+    v_u_112 = {}
+    for _, v114 in pairs(v_u_66:GetChildren()) do
+        if v114:IsA("ImageButton") then
+            v_u_3:AddItem(v114, 0)
+        end
+    end
+    local v115 = 0
+    local v116 = v_u_57:GetLocalData()
+    if v116 then
+        local v117 = v116.Bag
+        if v117 then
+            v_u_30 = v117
+            local v118 = 0
+            for _, v119 in pairs(v117) do
+                if v119.tp == v_u_64 then
+                    local v120 = v_u_15.FindCfgByID(v119.id, v_u_64)
+                    if v120 and (v120.xyd >= v_u_25["\230\179\176\229\157\166\229\174\160\231\137\169"]["\229\143\175\229\144\136\230\136\144\231\168\128\230\156\137\229\186\166"] or v120.Limit == "1") then
+                        v118 = v118 + 1
+                        local v_u_121 = v_u_65:Clone()
+                        v_u_121.Parent = v_u_66
+                        v_u_121.Frame:FindFirstChild("Choose").Visible = false
+                        local v122 = v_u_112
+                        local v123 = v_u_16.AddMouseCLick
+                        local function v124()
+                            -- upvalues: (copy) v_u_121, (ref) v_u_71, (ref) v_u_82, (ref) v_u_94, (ref) v_u_111
+                            v_u_121:GetAttribute("petID")
+                            v_u_121:GetAttribute("onlyID")
+                            if v_u_71 then
+                                v_u_82()
+                                v_u_94(v_u_121)
+                                v_u_111()
+                            else
+                                v_u_94(v_u_121)
+                            end
+                        end
+                        table.insert(v122, v123(v_u_121, v124, v_u_121))
+                        v_u_121:SetAttribute("petID", v119.id)
+                        v_u_121:SetAttribute("onlyID", v119.onlyID)
+                        local v125 = v_u_9.BigLv.Normal
+                        if v119.BigLv then
+                            v125 = v119.BigLv
+                        end
+                        v_u_121:SetAttribute("BigLv", v125)
+                        v_u_121.Visible = true
+                        v_u_106(v_u_121, v119, v120)
+                        v115 = v115 + 1
+                    end
+                end
+            end
+            local v126 = v_u_66.UIGridLayout
+            local _ = v126.CellSize.X.Offset
+            local v127 = v126.CellSize.Y.Offset
+            local v128 = v126.CellPadding.Y.Offset
+            local v129 = v115 / 4
+            local v130 = math.ceil(v129)
+            v_u_66.CanvasSize = UDim2.new(0, 0, 0, (v127 + v128) * v130)
+            v_u_111()
+            v_u_31:updateText()
+        end
+    else
+        return
+    end
+end
+local function v148(p_u_132, p133, p_u_134) -- name: AddClickFun
+    -- upvalues: (copy) v_u_16, (copy) v_u_63, (copy) v_u_6, (copy) v_u_18, (copy) v_u_35, (copy) v_u_9, (copy) v_u_11, (copy) v_u_20, (ref) v_u_71, (copy) v_u_82, (copy) v_u_131
+    v_u_16.NumValueAdd(p133, function(p135)
+        -- upvalues: (copy) p_u_132, (ref) v_u_63, (ref) v_u_6, (ref) v_u_18, (ref) v_u_35, (ref) v_u_9, (ref) v_u_11
+        if p135 == 0 then
+            p_u_132.ShowFrame.Visible = false
+            p_u_132.AddFrame.Visible = true
+            p_u_132.AddIcon.Visible = true
+            local v136 = p_u_132:FindFirstChild("Limit")
+            if v136 then
+                v136.Visible = false
+            end
+        else
+            local v137, v138 = v_u_63(p135)
+            v_u_6.createViewPort(p_u_132.ShowFrame.ViewportFrame, v137.id, nil, v137)
+            p_u_132.ShowFrame.Visible = true
+            local v139 = p_u_132.ShowFrame.BG
+            local v140 = v_u_18:FindFirstChild(v138.xyd)
+            local v141 = v139:FindFirstChild("\230\184\144\229\143\152\232\137\178")
+            if v141 then
+                v141:Destroy()
+            end
+            if v138.xyd == 5 then
+                local v142 = v140:FindFirstChild("\230\184\144\229\143\152\232\137\178"):Clone()
+                v142.Parent = v139
+                v142.Name = "\230\184\144\229\143\152\232\137\178"
+            end
+            v139.Visible = true
+            v139.Image = v140.Image
+            v139.SliceCenter = v140.SliceCenter
+            local v143 = p_u_132:FindFirstChild("Limit")
+            if v143 then
+                if v138.Limit == "1" then
+                    v143.Visible = true
+                else
+                    v143.Visible = false
+                end
+            end
+            if v137.Magic then
+                local v144 = v_u_35
+                local v145 = v137.Magic
+                local v146 = v144[tonumber(v145)]
+                if v146 then
+                    p_u_132.ShowFrame.Magic.Image = "rbxassetid://" .. v146.Icon
+                    p_u_132.ShowFrame.Magic.Visible = true
+                end
+            else
+                p_u_132.ShowFrame.Magic.Visible = false
+            end
+            local v147 = v_u_9.BigLv.Normal
+            if v137.BigLv then
+                v147 = v137.BigLv
+            end
+            v_u_11.SetBigLvUI(p_u_132.ShowFrame, v147)
+            p_u_132.AddIcon.Visible = false
+            p_u_132.AddFrame.Visible = false
+        end
+    end)
+    v_u_16.AddMouseCLick(p_u_132.Button, function()
+        -- upvalues: (ref) v_u_20, (ref) v_u_71, (copy) p_u_134, (ref) v_u_82, (ref) v_u_131
+        v_u_20.Visible = true
+        v_u_71 = p_u_134
+        if v_u_71 then
+            v_u_82()
+        end
+        v_u_131()
+    end, p_u_132.AddIcon)
+end
+v148(v_u_23["\228\184\187\229\174\160\231\137\169"], v_u_26, true)
+local v_u_149 = v_u_71
+local v150 = 0
+for _, v151 in pairs(v_u_23["\230\157\144\230\150\153"]:GetChildren()) do
+    if v151:IsA("Frame") then
+        v150 = v150 + 1
+        v148(v151, v_u_27:FindFirstChild(v150), false)
+    end
+end
+function v_u_31.updateUi(_) -- name: updateUi end
+function v_u_31.openUi(_) -- name: openUi
+    -- upvalues: (copy) v_u_19, (copy) v_u_21, (copy) v_u_20, (copy) v_u_22, (copy) v_u_23, (copy) v_u_13, (copy) v_u_42, (copy) v_u_78
+    v_u_19.Frame.Visible = true
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+    v_u_20.Visible = false
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+    v_u_21.Visible = false
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+    v_u_22.Visible = false
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+    v_u_23["\228\184\187\229\174\160\231\137\169"].AddFrame.Visible = true
+    v_u_23["\228\184\187\229\174\160\231\137\169"].AddIcon.Visible = true
+    v_u_13.HideAllDetail()
+    v_u_42()
+    v_u_78()
+end
+function v_u_31.closeUi(_) -- name: closeUi
+    -- upvalues: (copy) v_u_13, (copy) v_u_10, (copy) v_u_26
+    v_u_13.HideAllDetail()
+    v_u_10.PopBack(script.Parent)
+    v_u_26.Value = 0
+end
+v_u_16.AddMouseCLick(v_u_20.BG.Exit.Button, function()
+    -- upvalues: (copy) v_u_20, (copy) v_u_21, (copy) v_u_19, (copy) v_u_22, (ref) v_u_149, (copy) v_u_82, (copy) v_u_27, (copy) v_u_66
+    v_u_20.Visible = false
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+    v_u_19.Frame.Visible = true
+    if v_u_21.Visible or v_u_20.Visible then
+        v_u_19.Frame.Visible = false
+        v_u_19.BG.Visible = false
+    elseif v_u_22.Visible then
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    else
+        v_u_19.Frame.Visible = true
+        v_u_19.BG.Visible = true
+    end
+    if v_u_149 then
+        v_u_82()
+    else
+        for _, v152 in pairs(v_u_27:GetChildren()) do
+            if v152:IsA("NumberValue") then
+                v152.Value = 0
+            end
+        end
+        for _, v153 in pairs(v_u_66:GetChildren()) do
+            if v153.ClassName ~= "UIGridLayout" then
+                local v154 = v153.Frame:FindFirstChild("Choose")
+                if v154 then
+                    v154.Visible = false
+                end
+            end
+        end
+    end
+end, v_u_20.BG.Exit)
+return v_u_31
