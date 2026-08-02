@@ -1,4 +1,4 @@
--- GUI Controller untuk membuka UI_Control dari StarterGui
+-- GUI Controller dengan metode One-Liner
 local player = game.Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -30,7 +30,7 @@ titleLabel.Size = UDim2.new(1, 0, 0, 35)
 titleLabel.Position = UDim2.new(0, 0, 0, 0)
 titleLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
 titleLabel.BackgroundTransparency = 0.2
-titleLabel.Text = "🚀 UI_Control Opener"
+titleLabel.Text = "🚀 One-Liner GUI Opener"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 16
 titleLabel.TextScaled = true
@@ -57,7 +57,7 @@ nameTextBox.Size = UDim2.new(0.9, 0, 0, 32)
 nameTextBox.Position = UDim2.new(0.05, 0, 0, 70)
 nameTextBox.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
 nameTextBox.BackgroundTransparency = 0.3
-nameTextBox.Text = "FusePet"
+nameTextBox.Text = "UI_Control"
 nameTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 nameTextBox.TextSize = 14
 nameTextBox.Font = Enum.Font.Gotham
@@ -109,14 +109,14 @@ statusLabel.Name = "StatusLabel"
 statusLabel.Size = UDim2.new(0.9, 0, 0, 30)
 statusLabel.Position = UDim2.new(0.05, 0, 0, 155)
 statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "💡 Status: Siap - Default: FusePet"
+statusLabel.Text = "💡 Status: Siap - Default: UI_Control"
 statusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
 statusLabel.TextSize = 12
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.Font = Enum.Font.Gotham
 statusLabel.Parent = mainFrame
 
--- Fungsi untuk membuka UI_Control
+-- Fungsi untuk menjalankan One-Liner
 local function openUI()
     local guiName = nameTextBox.Text
     if guiName == "" then
@@ -125,27 +125,25 @@ local function openUI()
         return
     end
     
-    statusLabel.Text = "⏳ Status: Mencari " .. guiName .. "..."
+    statusLabel.Text = "⏳ Status: Menjalankan one-liner untuk " .. guiName .. "..."
     statusLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
     
-    -- Script utama dengan path yang sudah dikonfirmasi
-    local success, result = pcall(function()
-        -- Path: StarterGui → ScreenGui → [NamaGUI] → UI_Control
-        local m = require(game:GetService("StarterGui"):WaitForChild("ScreenGui"):WaitForChild(guiName):WaitForChild("UI_Control"))
+    -- One-Liner yang dimodifikasi dengan nama GUI dinamis
+    local success = pcall(function() 
+        local m = require(game:GetService("StarterGui"):WaitForChild("ScreenGui"):WaitForChild(guiName))
         if m.openUi then 
             m.openUi() 
-            return "✅ UI_Control opened successfully!"
-        else
-            return "⚠️ UI_Control found but no openUi function!"
         end
     end)
     
     if success then
-        statusLabel.Text = result
-        statusLabel.TextColor3 = result:match("✅") and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 200, 100)
+        statusLabel.Text = "✅ Status: " .. guiName .. " berhasil dibuka!"
+        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        print("✅ GUI Opened!")
     else
-        statusLabel.Text = "❌ Error: " .. tostring(result)
+        statusLabel.Text = "❌ Status: Gagal membuka " .. guiName .. "!"
         statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        warn("❌ Gagal!")
     end
 end
 
@@ -180,4 +178,4 @@ nameTextBox.FocusLost:Connect(function(enterPressed)
 end)
 
 -- Status awal
-statusLabel.Text = "💡 Status: Siap - Default: FusePet"
+statusLabel.Text = "💡 Status: Siap - Default: UI_Control"
