@@ -1,0 +1,59 @@
+local v_u_1 = {}
+local v2 = game:GetService("ReplicatedStorage")
+require(v2.ConfigInstance)
+local v_u_3 = require(v2.Tool.CfgFind)
+require(v2.Tool.MathMgr)
+require(v2.Tool.CheckGamePass)
+require(v2.Tool.Copy)
+require(v2.Tool.Viewport)
+local v_u_4 = game:GetService("Debris")
+local v_u_5 = require(v2.Tool.UIanima)
+local v_u_6 = require(v2.Tool.UIMgr)
+require(v2.Tool.ShowDetail)
+require(v2.Tool.TipsModule)
+require(v2.Tool.GradientsMgr)
+local v_u_7 = require(v2.Tool.EnumMgr)
+require(v2.Tool.GetData)
+local _ = game.Players.LocalPlayer
+local _ = v2.Msg.RemoteEvent
+local v8 = require(v2.Tool.AddListen)
+local v9 = script.Parent
+local v_u_10 = v9.Frame.Tips
+local v_u_11 = v9.Frame.ScrollingFrame
+local v_u_12 = v2.UI.RewardUiTemp
+local v13 = v9.BG.Exit.Button
+v8.AddMouseCLick(v13, function()
+    -- upvalues: (copy) v_u_1
+    v_u_1:closeUi()
+end, v13.Parent)
+local v14 = v9.Frame["\231\161\174\232\174\164"]
+v8.AddMouseCLick(v14.Button, function()
+    -- upvalues: (copy) v_u_1
+    v_u_1:closeUi()
+end, v14)
+function v_u_1.updateUi(_, p15) -- name: updateUi
+    -- upvalues: (copy) v_u_3, (copy) v_u_7, (copy) v_u_11, (copy) v_u_4, (copy) v_u_12, (copy) v_u_6, (copy) v_u_10
+    local v16 = v_u_3.FindCfgByID(tonumber(p15) + 16000000, v_u_7.ItemType.SouvenirBox)
+    if v16 then
+        for _, v17 in pairs(v_u_11:GetChildren()) do
+            if v17:IsA("Frame") then
+                v_u_4:AddItem(v17, 0)
+            end
+        end
+        local v18 = 0
+        for _, v19 in pairs({ v16.ItemIDVt[1] }) do
+            local v20 = v_u_12:Clone()
+            v20.Parent = v_u_11
+            v_u_6.SetAward(v20, v19, 1)
+            v18 = v18 + v20.Size.X.Offset
+        end
+        v_u_11.CanvasSize = UDim2.new(0, v18, 0, 0)
+        v_u_10.Text = v_u_3.FindCfgByID(v16.ItemIDVt[1], v_u_7.ItemType.Souvenir).ZhName
+    end
+end
+function v_u_1.openUi(_) -- name: openUi end
+function v_u_1.closeUi(_) -- name: closeUi
+    -- upvalues: (copy) v_u_5
+    v_u_5.PopBack(script.Parent)
+end
+return v_u_1
