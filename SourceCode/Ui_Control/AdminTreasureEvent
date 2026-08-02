@@ -1,0 +1,148 @@
+local v_u_1 = game:GetService("ReplicatedStorage")
+local v2 = require(v_u_1.Tool.AddListen)
+local v_u_3 = require(v_u_1.Tool.CfgFind)
+local v_u_4 = require(v_u_1.Tool.GetData)
+require(v_u_1.Tool.MathMgr)
+local v_u_5 = require(v_u_1.Tool.ShowDetail)
+local v_u_6 = require(v_u_1.System.SystemBuyRoblox)
+local v_u_7 = require(v_u_1.Tool.UIMgr)
+local v_u_8 = require(v_u_1.Tool.Viewport)
+local v_u_9 = require(v_u_1.Tool.UIanima)
+local v_u_10 = require(v_u_1.Tool.EnumMgr)
+local v_u_11 = game.Players.LocalPlayer
+local v_u_12 = v_u_1.Msg.RemoteFunction
+local _ = v_u_1.LocalMsg.showLocalUI
+local v_u_13 = script.Parent
+local v14 = v_u_13.Frame
+local v_u_15 = v_u_3.GetCfgByName("treasureadmineventConf")[1]
+local v16 = v_u_13.BG.Exit.Button
+local v17 = v14.Lottery
+local v_u_18 = v17.LotteryScroll
+local v19 = v17.BtnList
+local v_u_20 = v_u_18.temp
+local v_u_21 = v19.Btn
+local v_u_22 = v19.RobuxBtn1
+local v_u_23 = v19.RobuxBtn2
+local v_u_24 = v_u_11:WaitForChild("CanInteractTreasureLootbox", (1 / 0))
+local v_u_25 = {}
+v2.AddMouseCLick(v16, function()
+    -- upvalues: (copy) v_u_25
+    v_u_25:closeUi()
+end, v_u_13.BG.Exit)
+local v_u_26 = v_u_22.OnlyTag.Value
+local v_u_27 = v_u_3.FindCfgByOnlyTag(v_u_26)
+if v_u_27 then
+    task.spawn(function()
+        -- upvalues: (copy) v_u_22, (copy) v_u_4, (copy) v_u_27, (copy) v_u_7
+        v_u_22.priceText.Text = v_u_4.GetPrice(v_u_27)
+        v_u_7.SetRbPrice_color(v_u_22.priceText, v_u_4.GetPrice(v_u_27), "#FFFFFF")
+    end)
+end
+v2.AddMouseCLick(v_u_22.Button, function()
+    -- upvalues: (copy) v_u_26, (copy) v_u_6, (copy) v_u_11
+    if v_u_26 then
+        v_u_6.BuyRobloxByOnlyTag(v_u_11, v_u_26)
+    end
+end, v_u_22)
+local v_u_28 = v_u_23.OnlyTag.Value
+local v_u_29 = v_u_3.FindCfgByOnlyTag(v_u_28)
+if v_u_29 then
+    task.spawn(function()
+        -- upvalues: (copy) v_u_23, (copy) v_u_4, (copy) v_u_29, (copy) v_u_7
+        v_u_23.priceText.Text = v_u_4.GetPrice(v_u_29)
+        v_u_7.SetRbPrice_color(v_u_23.priceText, v_u_4.GetPrice(v_u_29), "#FFFFFF")
+    end)
+end
+v2.AddMouseCLick(v_u_23.Button, function()
+    -- upvalues: (copy) v_u_28, (copy) v_u_6, (copy) v_u_11
+    if v_u_28 then
+        v_u_6.BuyRobloxByOnlyTag(v_u_11, v_u_28)
+    end
+end, v_u_23)
+v2.AddMouseCLick(v_u_21.Button, function()
+    -- upvalues: (copy) v_u_1, (copy) v_u_24, (copy) v_u_12
+    if v_u_1:GetAttribute("TreasureHunt") then
+        if v_u_24.Value ~= 0 then
+            v_u_12:InvokeServer("AdminBoxHatch")
+        end
+    else
+        return
+    end
+end, v_u_21)
+local function v_u_38() -- name: InitList
+    -- upvalues: (copy) v_u_18, (copy) v_u_15, (copy) v_u_3, (copy) v_u_20, (copy) v_u_7, (copy) v_u_8, (copy) v_u_10, (copy) v_u_4
+    for _, v30 in v_u_18:GetChildren() do
+        if v30:IsA("Frame") and v30.Name ~= "temp" then
+            v30:Destroy()
+        end
+    end
+    for v31, v32 in v_u_15.ItemIDVt do
+        local v33 = v_u_3.FindCfgByID(v32)
+        if v33 then
+            local v34
+            if v_u_18:FindFirstChild(v32) then
+                v34 = v_u_18:FindFirstChild(v32)
+            else
+                v34 = v_u_20:Clone()
+                v34.Visible = true
+                v34.Name = v32
+            end
+            v34.Parent = v_u_18
+            local v35 = v34.Icon
+            local v36 = v34.BG
+            v_u_7.setXydBg_T26(v36, v33.xyd)
+            v34.ViewportFrame:ClearAllChildren()
+            v34.ViewportFrame:SetAttribute("itemID", nil)
+            if v35 and (v33.Icon and v33.Icon ~= "") then
+                v35.Visible = true
+                v35.Image = "rbxassetid://" .. v33.Icon
+                v34.ViewportFrame.Visible = false
+            else
+                v34.ViewportFrame.Visible = true
+                v_u_8.createViewPort(v34.ViewportFrame, v32)
+                if v33.tp == v_u_10.ItemType.Coach then
+                    v34.ViewportFrame.CurrentCamera.CFrame = CFrame.new(Vector3.new(0, 2, 1)) * CFrame.Angles(0, 3.141592653589793, 0)
+                end
+            end
+            v34.Visible = true
+            local v37, _ = v_u_4.GetChanceNoLucky(v_u_15.ItemWeight, v_u_15.ItemIDVt)
+            if v37[v31] then
+                v34.Chance.Text = v37[v31]
+            end
+            v_u_7.SetAtk(v32, v34)
+            v_u_7.SetDetail(v34, v32)
+        end
+    end
+    v_u_20.Visible = false
+end
+function v_u_25.updateUi(_) -- name: updateUi
+    -- upvalues: (copy) v_u_38
+    v_u_38()
+end
+function v_u_25.openUi(_) -- name: openUi
+    -- upvalues: (copy) v_u_1, (copy) v_u_5
+    if v_u_1:GetAttribute("TreasureHunt") then
+        v_u_5.HideAllDetail()
+    end
+end
+function v_u_25.closeUi(_) -- name: closeUi
+    -- upvalues: (copy) v_u_5, (copy) v_u_9, (copy) v_u_13
+    v_u_5.HideAllDetail()
+    v_u_9.PopBack(v_u_13)
+end
+v_u_21.Tips.Text = "Remaining (1)"
+v_u_1:GetAttributeChangedSignal("TreasureHunt"):Connect(function()
+    -- upvalues: (copy) v_u_1, (copy) v_u_25
+    if not v_u_1:GetAttribute("TreasureHunt") then
+        v_u_25:closeUi()
+    end
+end)
+v_u_24:GetPropertyChangedSignal("Value"):Connect(function()
+    -- upvalues: (copy) v_u_24, (copy) v_u_21
+    if v_u_24.Value == 1 then
+        v_u_21.Tips.Text = "Remaining (1)"
+    else
+        v_u_21.Tips.Text = "Remaining (0)"
+    end
+end)
+return v_u_25
