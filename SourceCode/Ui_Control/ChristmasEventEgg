@@ -1,0 +1,136 @@
+local v1 = game:GetService("ReplicatedStorage")
+local v2 = require(v1.Tool.AddListen)
+local v3 = require(v1.Tool.CfgFind)
+local v_u_4 = require(v1.Tool.GetData)
+require(v1.Tool.MathMgr)
+local v_u_5 = require(v1.Tool.ShowDetail)
+local v_u_6 = require(v1.System.SystemBuyRoblox)
+local v_u_7 = require(v1.Tool.UIMgr)
+require(v1.Tool.Viewport)
+local v_u_8 = require(v1.Tool.UIanima)
+require(v1.Tool.EnumMgr)
+local v_u_9 = game.Players.LocalPlayer
+local v_u_10 = v1.Msg.RemoteFunction
+local _ = v1.LocalMsg.showLocalUI
+local v11 = v1.GlobalConfig
+local v_u_12 = require(v11.ConfigModule)["\229\164\143\230\151\165\230\180\187\229\138\168\233\133\141\231\189\174"].EventEgg
+local v_u_13 = script.Parent
+local _ = v_u_13.Frame
+local v14 = v_u_13:FindFirstChild("Cliam")
+local v_u_15 = v14:FindFirstChild("ClaimBtn")
+local v16 = v14:FindFirstChild("\232\191\155\229\186\166\230\157\161")
+local v_u_17 = v16:FindFirstChild("Bar")
+local v_u_18 = v16:FindFirstChild("Progress")
+local v19 = v_u_13.BG.Exit.Button
+local v20 = v_u_13.Egg.LimitedEgg3
+local v_u_21 = v20.ButtonBuy1
+local v_u_22 = v20.ButtonBuy3
+local v_u_23 = v20.ButtonBuy10
+local v_u_24 = {}
+v2.AddMouseCLick(v19, function()
+    -- upvalues: (copy) v_u_24
+    v_u_24:closeUi()
+end, v19.Parent)
+local v_u_25 = v_u_21.OnlyTag.Value
+local v_u_26 = v3.FindCfgByOnlyTag(v_u_25)
+if v_u_26 then
+    task.spawn(function()
+        -- upvalues: (copy) v_u_21, (copy) v_u_4, (copy) v_u_26, (copy) v_u_7
+        v_u_21.Price.Text = v_u_4.GetPrice(v_u_26)
+        v_u_7.SetRbPrice_color(v_u_21.Price, v_u_4.GetPrice(v_u_26), "#FFFFFF")
+    end)
+end
+local v_u_27 = v_u_22.OnlyTag.Value
+local v_u_28 = v3.FindCfgByOnlyTag(v_u_27)
+if v_u_28 then
+    task.spawn(function()
+        -- upvalues: (copy) v_u_22, (copy) v_u_4, (copy) v_u_28, (copy) v_u_7
+        v_u_22.Price.Text = v_u_4.GetPrice(v_u_28)
+        v_u_7.SetRbPrice_color(v_u_22.Price, v_u_4.GetPrice(v_u_28), "#FFFFFF")
+    end)
+end
+v2.AddMouseCLick(v_u_15.Button, function()
+    -- upvalues: (copy) v_u_12, (copy) v_u_4, (copy) v_u_9, (copy) v_u_10
+    if v_u_12 * 60 <= v_u_4.GetRecordNum(v_u_9, "ChristmasEggOnlineTime") then
+        v_u_10:InvokeServer("ClaimEggEventAFKReward")
+    end
+end, v_u_15)
+v2.AddMouseCLick(v_u_21, function()
+    -- upvalues: (copy) v_u_25, (copy) v_u_6, (copy) v_u_9
+    if v_u_25 then
+        v_u_6.BuyRobloxByOnlyTag(v_u_9, v_u_25)
+    end
+end, v_u_21)
+v2.AddMouseCLick(v_u_22, function()
+    -- upvalues: (copy) v_u_27, (copy) v_u_6, (copy) v_u_9
+    if v_u_27 then
+        v_u_6.BuyRobloxByOnlyTag(v_u_9, v_u_27)
+    end
+end, v_u_22)
+local v_u_29 = v_u_23.OnlyTag.Value
+local v_u_30 = v3.FindCfgByOnlyTag(v_u_29)
+if v_u_30 then
+    task.spawn(function()
+        -- upvalues: (copy) v_u_23, (copy) v_u_4, (copy) v_u_30, (copy) v_u_7
+        v_u_23.Price.Text = v_u_4.GetPrice(v_u_30)
+        v_u_7.SetRbPrice_color(v_u_23.Price, v_u_4.GetPrice(v_u_30), "#FFFFFF")
+    end)
+end
+v2.AddMouseCLick(v_u_23, function()
+    -- upvalues: (copy) v_u_29, (copy) v_u_6, (copy) v_u_9
+    if v_u_29 then
+        v_u_6.BuyRobloxByOnlyTag(v_u_9, v_u_29)
+    end
+end, v_u_23)
+local function v_u_45() -- name: UpdateClaimUI
+    -- upvalues: (copy) v_u_4, (copy) v_u_9, (copy) v_u_12, (copy) v_u_15, (copy) v_u_17, (copy) v_u_18
+    local v31 = v_u_4.GetRecordNum(v_u_9, "ChristmasEggOnlineTime") or 0
+    local v32 = v_u_12 * 60
+    local v33 = v31 / v32
+    local v34 = math.floor(v33)
+    if v_u_15 and v_u_15:FindFirstChild("BtnStr") then
+        v_u_15.BtnStr.Text = v34 > 0 and (string.format("Claim(%d)", v34) or "Claim") or "Claim"
+    end
+    if v_u_17 then
+        local v35 = v31 / v32
+        local v36 = math.min(1, v35)
+        v_u_17.Size = UDim2.new(v36, 0, 1, 0)
+    end
+    if v_u_18 then
+        local v37 = v31 / 60
+        local v38 = math.floor(v37)
+        local v39 = v31 % 60
+        local v40 = math.floor(v39)
+        local v41 = v32 / 60
+        local v42 = math.floor(v41)
+        local v43 = v32 % 60
+        local v44 = math.floor(v43)
+        if v34 < 10 then
+            v_u_18.Text = string.format("%02d:%02d/%02d:%02d", v38, v40, v42, v44)
+            return
+        end
+        v_u_18.Text = "MAX LIMIT, PLEASE CLAIM"
+    end
+end
+function v_u_24.updateUi(_) -- name: updateUi
+    -- upvalues: (copy) v_u_45, (copy) v_u_9
+    v_u_45()
+    local v46 = v_u_9:FindFirstChild("Record")
+    local v47 = v46 and v46:FindFirstChild("ChristmasEggOnlineTime")
+    if v47 then
+        v47.Changed:Connect(function()
+            -- upvalues: (ref) v_u_45
+            v_u_45()
+        end)
+    end
+end
+function v_u_24.openUi(_) -- name: openUi
+    -- upvalues: (copy) v_u_5
+    v_u_5.HideAllDetail()
+end
+function v_u_24.closeUi(_) -- name: closeUi
+    -- upvalues: (copy) v_u_5, (copy) v_u_8, (copy) v_u_13
+    v_u_5.HideAllDetail()
+    v_u_8.PopBack(v_u_13)
+end
+return v_u_24
