@@ -1,5 +1,5 @@
 --[[
-    AUTO COIN V4
+    AUTO COIN V4 - FIXED CLAIM LOGIC (7/8 delay)
 --]]
 
 ------ SERVICES ------
@@ -37,6 +37,7 @@ local DEFAULT_DELAY = 5
 local HEIGHT_MULTIPLIER = 2.8
 local MAX_HEIGHT = 14400
 local MIN_CLIMB_DURATION = 2
+local CLAIM_RATIO = 7 / 8  -- 87.5% dari total delay
 
 ------ STATE MANAGEMENT ------
 local State = {
@@ -51,9 +52,9 @@ local State = {
     lockSpeed = false,
     tokenClaimed = false,
     tokenClaimTime = 0,
-    coinDelay = DEFAULT_DELAY,      -- ABSOLUT dari user input
-    currentTokenDelay = 0,          -- Untuk display cooldown token
-    currentWinDelay = 0,            -- Untuk display cooldown win
+    coinDelay = DEFAULT_DELAY,
+    currentTokenDelay = 0,
+    currentWinDelay = 0,
     runTime = 0,
     lastLoopTime = 0,
     nextLoopTime = 0,
@@ -65,6 +66,8 @@ local State = {
     climbStartY = 0,
     climbStartTime = 0,
     maxY = 0,
+    winClaimedThisLoop = false,
+    tokenClaimedThisLoop = false,
 }
 
 ------ UTILITY FUNCTIONS ------
@@ -82,9 +85,8 @@ local function GetTokenDelay()
     return 0
 end
 
--- Height = f(Speed, Delay) - SATU ARAH
 local function CalculateHeight()
-    local delay = State.coinDelay  -- ← HANYA BACA
+    local delay = State.coinDelay
     local calculatedHeight = math.floor((State.climbSpeed * HEIGHT_MULTIPLIER) * delay)
     return math.min(calculatedHeight, MAX_HEIGHT)
 end
@@ -95,9 +97,7 @@ local function UpdateHeight()
     end
 end
 
------- UPDATE DELAYS (HANYA BACA DARI INPUT) ------
 local function UpdateDelays()
-    -- HANYA baca dari input, tidak ada yang mengubah selain user
     local input = tonumber(GUI.DelayTextBox.Text)
     if input and input > 0 then
         State.coinDelay = input
@@ -105,12 +105,10 @@ local function UpdateDelays()
         State.coinDelay = DEFAULT_DELAY
         GUI.DelayTextBox.Text = string.format("%.1f", DEFAULT_DELAY)
     end
-    
-    -- Hitung delay untuk display cooldown saja (TIDAK mempengaruhi coinDelay)
+
     State.currentTokenDelay = GetTokenDelay()
     State.currentWinDelay = GetWinDelay()
-    
-    -- Update display height
+
     if State.climbSpeed > 0 then
         UpdateHeight()
     end
@@ -123,7 +121,7 @@ local function CreateiOSSwitch(parent, position, initialState, labelText)
     container.Position = position
     container.BackgroundTransparency = 1
     container.Parent = parent
-    
+
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(0.7, 0, 1, 0)
     label.Position = UDim2.new(0, 0, 0, 0)
@@ -134,7 +132,7 @@ local function CreateiOSSwitch(parent, position, initialState, labelText)
     label.TextSize = 12
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = container
-    
+
     local track = Instance.new("TextButton")
     track.Size = UDim2.new(0, 18, 0, 10)
     track.Position = UDim2.new(1, -18, 0.5, -5)
@@ -144,11 +142,11 @@ local function CreateiOSSwitch(parent, position, initialState, labelText)
     track.AutoButtonColor = false
     track.Text = ""
     track.Parent = container
-    
+
     local trackCorner = Instance.new("UICorner")
     trackCorner.CornerRadius = UDim.new(0, 5)
     trackCorner.Parent = track
-    
+
     local knob = Instance.new("TextButton")
     knob.Size = UDim2.new(0, 9, 0, 9)
     knob.Position = UDim2.new(0, 0.5, 0.5, -4.5)
@@ -158,35 +156,35 @@ local function CreateiOSSwitch(parent, position, initialState, labelText)
     knob.AutoButtonColor = false
     knob.Text = ""
     knob.Parent = track
-    
+
     local knobCorner = Instance.new("UICorner")
     knobCorner.CornerRadius = UDim.new(0, 4.5)
     knobCorner.Parent = knob
-    
+
     local knobShadow = Instance.new("UIShadow")
     knobShadow.Color = Color3.fromRGB(0, 0, 0)
     knobShadow.Transparency = 0.2
     knobShadow.Offset = UDim2.new(0, 0, 0, 0.5)
     knobShadow.Parent = knob
-    
+
     local isOn = initialState or false
     local onToggle = nil
-    
+
     local function updateSwitch()
         local targetPosition = isOn and UDim2.new(0, 8.5, 0.5, -4.5) or UDim2.new(0, 0.5, 0.5, -4.5)
         local targetColor = isOn and THEME.primaryBlue or Color3.fromRGB(200, 200, 200)
-        
+
         TweenService:Create(track, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             BackgroundColor3 = targetColor
         }):Play()
-        
+
         TweenService:Create(knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             Position = targetPosition
         }):Play()
     end
-    
+
     updateSwitch()
-    
+
     local function toggle()
         isOn = not isOn
         updateSwitch()
@@ -194,17 +192,17 @@ local function CreateiOSSwitch(parent, position, initialState, labelText)
             onToggle(isOn)
         end
     end
-    
+
     track.MouseButton1Click:Connect(toggle)
     knob.MouseButton1Click:Connect(toggle)
-    
+
     track.MouseEnter:Connect(function()
         track.BackgroundColor3 = isOn and Color3.fromRGB(0, 112, 235) or Color3.fromRGB(180, 180, 180)
     end)
     track.MouseLeave:Connect(function()
         track.BackgroundColor3 = isOn and THEME.primaryBlue or Color3.fromRGB(200, 200, 200)
     end)
-    
+
     return {
         setOn = function(value)
             isOn = value
@@ -227,49 +225,52 @@ local function UpdateStatusBar()
     local coinLed = coinReady and "●" or "○"
     local coinColor = coinReady and THEME.ledGreen or THEME.ledRed
     local coinTime = State.running and string.format("%.1fs", math.max(0, State.nextLoopTime - tick())) or "0.0s"
-    
+
     -- WIN: Hijau jika winID ada
     local winReady = State.winID ~= nil
     local winLed = winReady and "●" or "○"
     local winColor = winReady and THEME.ledGreen or THEME.ledRed
     local winTime = "0.0s"
     if State.autoWinEnabled and State.winID and State.running then
-        local currentWinDelay = State.currentWinDelay
-        winTime = string.format("%.1fs", math.max(0, currentWinDelay - (tick() - State.lastWinTime)))
+        if State.winClaimedThisLoop then
+            winTime = "✅"
+        else
+            -- Hitung sisa waktu sampai 7/8 delay
+            local claimTime = State.lastLoopTime + (State.coinDelay * CLAIM_RATIO)
+            local remaining = claimTime - tick()
+            winTime = string.format("%.1fs", math.max(0, remaining))
+        end
     end
-    
-    -- TOKEN: Hijau jika magicTokenID ada (tidak peduli switch ON/OFF)
+
+    -- TOKEN: Hijau jika magicTokenID ada
     local tokenReady = State.magicTokenID ~= nil
     local tokenLed = tokenReady and "●" or "○"
     local tokenColor = tokenReady and THEME.ledGreen or THEME.ledRed
-    
-    -- Cooldown token: HANYA BACA delay, tidak mengubahnya
     local tokenTime = "0.0s"
     if State.autoTokenEnabled and State.magicTokenID and State.running then
-        local halfDelay = State.coinDelay / 2  -- ← HANYA BACA
-        
-        if State.tokenClaimed then
-            local remainingToNext = State.nextLoopTime - tick()
-            tokenTime = string.format("%.1fs", math.max(0, remainingToNext))
+        if State.tokenClaimedThisLoop then
+            tokenTime = "✅"
         else
-            local remainingToMidpoint = (State.lastLoopTime + halfDelay) - tick()
-            tokenTime = string.format("%.1fs", math.max(0, remainingToMidpoint))
+            -- Hitung sisa waktu sampai 7/8 delay
+            local claimTime = State.lastLoopTime + (State.coinDelay * CLAIM_RATIO)
+            local remaining = claimTime - tick()
+            tokenTime = string.format("%.1fs", math.max(0, remaining))
         end
     end
-    
+
     GUI.CoinLabel.Text = string.format("Coin %s %s", coinLed, coinTime)
     GUI.CoinLabel.TextColor3 = coinColor
-    
+
     GUI.WinLabel.Text = string.format("Win %s %s", winLed, winTime)
     GUI.WinLabel.TextColor3 = winColor
-    
+
     GUI.TokenLabel.Text = string.format("Token %s %s", tokenLed, tokenTime)
     GUI.TokenLabel.TextColor3 = tokenColor
 end
 
 local function UpdateStatusMessage()
     local isReady = State.jumpID ~= nil and State.landingID ~= nil
-    
+
     if not isReady then
         GUI.StatusMessage.Text = "JUMP FROM TOWER FIRST"
         GUI.StatusMessage.TextColor3 = THEME.primaryRed
@@ -292,10 +293,10 @@ end
 local function ShowTemporaryMessage(text, color, duration)
     local oldText = GUI.StatusMessage.Text
     local oldColor = GUI.StatusMessage.TextColor3
-    
+
     GUI.StatusMessage.Text = text
     GUI.StatusMessage.TextColor3 = color
-    
+
     task.delay(duration or 1.5, function()
         if State.hookEnabled then
             GUI.StatusMessage.Text = oldText
@@ -306,7 +307,7 @@ end
 
 local function UpdateStatus()
     local isReady = State.jumpID ~= nil and State.landingID ~= nil
-    
+
     if isReady then
         State.isReady = true
         if State.running then
@@ -324,7 +325,7 @@ local function UpdateStatus()
         GUI.StartStopButton.TextColor3 = THEME.textSecondary
         GUI.StartStopButton.Text = "START AUTO COIN"
     end
-    
+
     UpdateStatusMessage()
     UpdateStatusBar()
 end
@@ -605,14 +606,14 @@ local function CreateGUI()
         false,
         "Lock Speed"
     )
-    
+
     local winSwitch = CreateiOSSwitch(
         SwitchFrame,
         UDim2.new(0, 0, 0, 15),
         false,
         "Auto Win"
     )
-    
+
     local tokenSwitch = CreateiOSSwitch(
         SwitchFrame,
         UDim2.new(0, 0, 0, 30),
@@ -660,7 +661,7 @@ local function CreateGUI()
         winSwitch = winSwitch,
         tokenSwitch = tokenSwitch,
     }
-    
+
     return GUI
 end
 
@@ -672,7 +673,7 @@ end
 
 local function SendJumpData()
     if State.jumpID then
-        local height = CalculateHeight()  -- ← HANYA BACA delay
+        local height = CalculateHeight()
         SendRemoteEvent("JumpResults", State.jumpID, height)
     end
 end
@@ -696,66 +697,72 @@ local function SendTokenData()
     end
 end
 
------- CORE LOGIC ------
+------ CORE LOGIC - FIXED (7/8 delay) ------
 local function RunLoop()
     while State.running and State.hookEnabled do
-        -- HANYA BACA delay dari user (TIDAK diubah)
-        local coinDelay = State.coinDelay  -- ← ABSOLUT dari user
+        local coinDelay = State.coinDelay
         
+        -- Reset status loop
+        State.winClaimedThisLoop = false
+        State.tokenClaimedThisLoop = false
         State.lastLoopTime = tick()
         State.nextLoopTime = State.lastLoopTime + coinDelay
-        State.tokenClaimed = false
 
-        -- === HANDLE TOKEN (MIDPOINT) ===
-        -- Token di-claim di MIDPOINT dari delay user
-        if State.autoTokenEnabled and State.magicTokenID then
-            local tokenTime = State.lastLoopTime + (coinDelay / 2)  -- ← HANYA BACA
-            while tick() < tokenTime and State.running and State.hookEnabled do
-                UpdateStatusBar()
-                task.wait(0.1)
+        -- === 1. CLAIM COIN PADA DETIK 0 ===
+        SendJumpData()
+        SendLandingData()
+        
+        GUI.StatusMessage.Text = "💰 COIN CLAIMED!"
+        GUI.StatusMessage.TextColor3 = THEME.ledGreen
+        task.delay(0.3, function()
+            if State.hookEnabled then
+                UpdateStatusMessage()
             end
-            if State.running and State.hookEnabled then
-                SendTokenData()
-                State.tokenClaimed = true
-                State.tokenClaimTime = tick()
-                
-                GUI.StatusMessage.Text = "✨ TOKEN CLAIMED!"
-                GUI.StatusMessage.TextColor3 = THEME.primaryYellow
-                task.delay(0.5, function()
-                    if State.hookEnabled then
-                        UpdateStatusMessage()
-                    end
-                end)
-            end
-        end
+        end)
 
-        -- === HANDLE WIN ===
-        if State.autoWinEnabled and State.winID then
-            local winDelay = State.currentWinDelay
-            if winDelay > 0 and (tick() - State.lastWinTime) >= winDelay then
-                SendWinData()
-                
-                GUI.StatusMessage.Text = "🏆 WIN CLAIMED!"
-                GUI.StatusMessage.TextColor3 = THEME.primaryYellow
-                task.delay(0.5, function()
-                    if State.hookEnabled then
-                        UpdateStatusMessage()
-                    end
-                end)
-            end
-        end
-
-        -- === WAIT REMAINING TIME ===
-        while tick() < State.nextLoopTime and State.running and State.hookEnabled do
+        -- === 2. HITUNG WAKTU CLAIM WIN & TOKEN (7/8 dari delay) ===
+        local winTokenClaimTime = State.lastLoopTime + (coinDelay * CLAIM_RATIO)
+        
+        -- Tunggu sampai waktu claim (update status setiap 10ms)
+        while tick() < winTokenClaimTime and State.running and State.hookEnabled do
             UpdateStatusBar()
-            task.wait(0.1)
+            task.wait(0.01) -- 10ms resolusi
         end
 
         if not State.running or not State.hookEnabled then break end
 
-        -- === CLAIM COIN ===
-        SendJumpData()
-        SendLandingData()
+        -- === 3. CLAIM WIN & TOKEN PADA 7/8 DELAY ===
+        if State.autoWinEnabled and State.winID then
+            SendWinData()
+            State.winClaimedThisLoop = true
+            GUI.StatusMessage.Text = "🏆 WIN CLAIMED!"
+            GUI.StatusMessage.TextColor3 = THEME.primaryYellow
+            task.delay(0.3, function()
+                if State.hookEnabled then
+                    UpdateStatusMessage()
+                end
+            end)
+        end
+
+        if State.autoTokenEnabled and State.magicTokenID then
+            SendTokenData()
+            State.tokenClaimedThisLoop = true
+            GUI.StatusMessage.Text = "✨ TOKEN CLAIMED!"
+            GUI.StatusMessage.TextColor3 = THEME.primaryYellow
+            task.delay(0.3, function()
+                if State.hookEnabled then
+                    UpdateStatusMessage()
+                end
+            end)
+        end
+
+        -- === 4. TUNGGU SAMPAI LOOP SELESAI ===
+        while tick() < State.nextLoopTime and State.running and State.hookEnabled do
+            UpdateStatusBar()
+            task.wait(0.01) -- 10ms resolusi
+        end
+
+        if not State.running or not State.hookEnabled then break end
 
         -- === AUTO-PAUSE ===
         State.runTime = State.runTime + (tick() - State.lastLoopTime)
@@ -778,7 +785,7 @@ end
 ------ CLIMB SPEED METER LOGIC ------
 local function SetupCharacter(char)
     local humanoid = char:WaitForChild("Humanoid")
-    
+
     local climbStartTime = 0
     local climbStartY = 0
     local maxY = 0
@@ -800,15 +807,13 @@ local function SetupCharacter(char)
                 local climbEndTime = tick()
                 local totalY = climbEndY - climbStartY
                 local totalTime = climbEndTime - climbStartTime
-                
+
                 if totalY > 0 and totalTime > MIN_CLIMB_DURATION then
                     State.climbSpeed = totalY / totalTime
                     GUI.SpeedLabel.Text = string.format("Speed: %.2f studs/s", State.climbSpeed)
-                    
+
                     if not State.lockSpeed then
-                        -- Height diupdate otomatis dari delay (SATU ARAH)
                         UpdateHeight()
-                        -- Update delays untuk display cooldown saja (TIDAK mengubah coinDelay)
                         UpdateDelays()
                     end
                 else
@@ -822,7 +827,7 @@ local function SetupCharacter(char)
                         end)
                     end
                 end
-                
+
                 isClimbing = false
                 State.climbing = false
             end
@@ -847,6 +852,8 @@ local function InitializeEventHandlers()
             State.running = not State.running
             if State.running then
                 State.lastWinTime = tick()
+                State.winClaimedThisLoop = false
+                State.tokenClaimedThisLoop = false
                 coroutine.wrap(RunLoop)()
             end
             UpdateStatus()
@@ -854,7 +861,8 @@ local function InitializeEventHandlers()
     end)
 
     GUI.StartStopButton.MouseEnter:Connect(function()
-        if not State.running then            GUI.StartStopButton.BackgroundColor3 = THEME.buttonHover
+        if not State.running then
+            GUI.StartStopButton.BackgroundColor3 = THEME.buttonHover
         end
     end)
     GUI.StartStopButton.MouseLeave:Connect(function()
@@ -872,7 +880,6 @@ local function InitializeEventHandlers()
         end
     end)
 
-    -- Auto Win Switch
     GUI.winSwitch.onChange(function(isOn)
         State.autoWinEnabled = isOn
         if State.winID then
@@ -893,7 +900,6 @@ local function InitializeEventHandlers()
         end
     end)
 
-    -- Auto Token Switch
     GUI.tokenSwitch.onChange(function(isOn)
         if State.magicTokenID then
             State.autoTokenEnabled = isOn
@@ -913,12 +919,11 @@ local function InitializeEventHandlers()
         end
     end)
 
-    -- Delay Box: HANYA baca input user, tidak ada yang mengubah selain user
     GUI.DelayTextBox:GetPropertyChangedSignal("Text"):Connect(function()
         if not State.lockSpeed then
             UpdateDelays()
             if State.climbSpeed > 0 then
-                UpdateHeight()  -- Height otomatis dari delay
+                UpdateHeight()
             end
         end
     end)
