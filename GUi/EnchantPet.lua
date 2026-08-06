@@ -1,75 +1,134 @@
--- Script MagicPet - Versi Ringkas
-local lp = game.Players.LocalPlayer
-local pg = lp:WaitForChild("PlayerGui")
+-- Script perbaikan untuk MagicPet - Memastikan semua tombol berfungsi
+local Players = game:GetService("Players")
+local lp = Players.LocalPlayer
 
--- Cari MagicPet
-local magicPet = pg:FindFirstChild("MagicPet") or 
-                  (pg:FindFirstChild("ScreenGui") and pg.ScreenGui:FindFirstChild("MagicPet"))
+-- Cari MagicPet di PlayerGui
+local magicPet = nil
+local pg = lp.PlayerGui
 
-if magicPet then
-    print("[MagicPet] Ditemukan!")
-    magicPet.Visible = true
-    
-    -- Cari UI_Control
-    local uiControl = magicPet:FindFirstChild("UI_Control")
-    
-    if uiControl then
-        local success, err = pcall(function()
-            local ctrl = require(uiControl)
-            if ctrl then
-                if ctrl.openUi then
-                    ctrl.openUi()
-                    print("[MagicPet] ✅ openUi() berhasil")
-                elseif ctrl.updateUi then
-                    ctrl.updateUi()
-                    print("[MagicPet] ✅ updateUi() berhasil")
-                else
-                    -- Manual show
-                    for _, child in ipairs(magicPet:GetDescendants()) do
-                        if child:IsA("GuiObject") then
-                            child.Visible = true
-                        end
-                    end
-                    print("[MagicPet] ✅ GUI dibuka manual")
-                end
-            end
-        end)
-        if not success then
-            print("[MagicPet] Error:", err)
-            -- Fallback manual
-            for _, child in ipairs(magicPet:GetDescendants()) do
-                if child:IsA("GuiObject") then
-                    child.Visible = true
-                end
-            end
-            print("[MagicPet] ✅ GUI dibuka manual (fallback)")
+for _, gui in ipairs(pg:GetChildren()) do
+    if gui:IsA("ScreenGui") then
+        local found = gui:FindFirstChild("MagicPet")
+        if found then
+            magicPet = found
+            print("[MagicPet] ✅ Ditemukan di:", gui.Name)
+            break
         end
-    else
-        -- Manual show semua
-        for _, child in ipairs(magicPet:GetDescendants()) do
-            if child:IsA("GuiObject") then
-                child.Visible = true
-            end
-        end
-        print("[MagicPet] ✅ GUI dibuka secara manual")
     end
-    
-    -- Aktifkan komponen utama
-    local frame = magicPet:FindFirstChild("Frame")
-    if frame then
-        frame.Visible = true
-        local main = frame:FindFirstChild("Main")
-        if main then main.Visible = true end
-    end
-    
-    local bg = magicPet:FindFirstChild("BG")
-    if bg then
-        bg.Visible = true
-        local exitBtn = bg:FindFirstChild("Exit")
-        if exitBtn then exitBtn.Visible = true end
-    end
-    
-    print("[MagicPet] 🎉 MagicPet GUI berhasil dibuka!")
-else
-    warn("[MagicPet] ❌ Tidak ditemukan!")
 end
+
+if not magicPet then
+    warn("[MagicPet] ❌ GUI tidak ditemukan!")
+    return
+end
+
+-- 1. TAMPILKAN GUI
+magicPet.Visible = true
+
+-- 2. FUNGSI UNTUK MENAMPILKAN SEMUA ELEMEN
+local function showAll(obj)
+    if obj:IsA("GuiObject") then
+        obj.Visible = true
+        -- Aktifkan interaksi
+        if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+            obj.Active = true
+            obj.Interactable = true
+            obj.Selectable = true
+        end
+    end
+    for _, child in ipairs(obj:GetChildren()) do
+        showAll(child)
+    end
+end
+
+-- 3. TAMPILKAN SEMUA ELEMEN TERLEBIH DAHULU
+showAll(magicPet)
+print("[MagicPet] ✅ Semua elemen ditampilkan")
+
+-- 4. PANGGIL CONTROLLER
+local uiControl = magicPet:FindFirstChild("UI_Control")
+local controller = nil
+
+if uiControl and uiControl:IsA("ModuleScript") then
+    local success, result = pcall(require, uiControl)
+    if success then
+        controller = result
+        print("[MagicPet] ✅ Controller berhasil dimuat!")
+    else
+        print("[MagicPet] ❌ Gagal memuat controller:", result)
+    end
+end
+
+-- 5. PANGGIL SEMUA FUNGSI YANG DIPERLUKAN
+if controller then
+    -- Daftar fungsi yang harus dipanggil untuk inisialisasi
+    local initFunctions = {
+        "updateUi", "Init", "Initialize", "Setup", 
+        "openUi", "Show", "Refresh", "Reload"
+    }
+    
+    local called = {}
+    for _, funcName in ipairs(initFunctions) do
+        if controller[funcName] then
+            local success, err = pcall(controller[funcName], controller)
+            if success then
+                print("[MagicPet] ✅ " .. funcName .. "() berhasil dipanggil")
+                table.insert(called, funcName)
+            else
+                print("[MagicPet] ⚠️ " .. funcName .. "() gagal:", err)
+            end
+        end
+    end
+    
+    -- Jika tidak ada fungsi yang dipanggil, coba panggil semua fungsi
+    if #called == 0 then
+        print("[MagicPet] ⚠️ Tidak ada fungsi inisialisasi yang ditemukan!")
+        print("[MagicPet] Mencoba memanggil semua fungsi...")
+        
+        for key, value in pairs(controller) do
+            if type(value) == "function" then
+                local success, err = pcall(value, controller)
+                if success then
+                    print("[MagicPet] ✅ " .. key .. "() dipanggil")
+                end
+            end
+        end
+    end
+end
+
+-- 6. AKTIFKAN SEMUA TOMBOL SECARA MANUAL
+local function activateAllButtons(parent)
+    for _, child in ipairs(parent:GetChildren()) do
+        if child:IsA("TextButton") or child:IsA("ImageButton") then
+            child.Visible = true
+            child.Active = true
+            child.Interactable = true
+            child.Selectable = true
+            child.AutoButtonColor = true
+            
+            -- Set background transparansi jika ada
+            if child:IsA("ImageButton") then
+                child.ImageTransparency = 0
+            end
+        end
+        
+        -- Rekursif ke child
+        if child:IsA("Frame") or child:IsA("ScrollingFrame") or child:IsA("ScreenGui") then
+            activateAllButtons(child)
+        end
+    end
+end
+
+activateAllButtons(magicPet)
+print("[MagicPet] ✅ Semua tombol diaktifkan")
+
+-- 7. TUNGGU SEBENTAR DAN REFRESH
+task.wait(0.5)
+
+-- 8. COBA PANGGIL UPDATE UI LAGI
+if controller and controller.updateUi then
+    pcall(controller.updateUi, controller)
+    print("[MagicPet] ✅ updateUi() dipanggil ulang")
+end
+
+print("[MagicPet] 🎉 GUI siap digunakan! Tombol seharusnya berfungsi.")
